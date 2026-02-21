@@ -5,6 +5,7 @@ class TaskType(Enum):
     BINARY = "binary"
     MULTICLASS = "multiclass"
     REGRESSION = "regression"
+    TIME_SERIES = "time_series"
     AUTO = "auto"
 
 
