@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import List, Union, TypeVar
 
 
 Numeric = Union[float, int]
+
+StatsT = TypeVar("StatsT")
 
 
 @dataclass
@@ -11,12 +13,17 @@ class NumericalColumnStats:
     min: Numeric
     mean: Numeric
     median: Numeric
+    mode: Numeric
     std: Numeric
     variance: Numeric
     skewness: float
+    kurtosis: float
     range: Numeric
     n_unique: Numeric
-    quantiles: Dict[str, Numeric]
+    missing_ratio: float
+    outlier_ratio: float
+    q1: Numeric
+    q3: Numeric
 
 
 @dataclass
@@ -28,4 +35,4 @@ class CategoricalColumnStats:
     rare_categories: List[str]
     rare_ratio: float
     entropy: float
-    has_typos: bool
+    mode: str

@@ -1,53 +1,54 @@
-from abc import ABC, abstractmethod
-from enum import Enum, auto
 import pandas as pd
-import numpy as np
 
+from pills_core.strategies.numeric.base import NumericalStrategy
+from pills_core.strategies.priorities import Priority
 from pills_core.types.stats import NumericalColumnStats
 
 
-class OutlierStrategy(Enum, str):
-    WINSORIZE = auto()
-    IQR = auto()
-    PERCENTILE = auto()
+class IQRStrategy(NumericalStrategy):
+    def __init__(self) -> None:
+        super().__init__(name="iqr")
 
-    NONE = auto()
+    def should_apply(self, stats: NumericalColumnStats, is_target: bool) -> bool:
+        return not is_target and abs(stats.skewness) < 1.5
 
+    def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
+        iqr = stats.q3 - stats.q1
+        return data.clip(lower=stats.q1 - 1.5 * iqr, upper=stats.q3 + 1.5 * iqr)
 
-class ImputationStrategy(Enum, str):
-    MEDIAN = auto()
-    MEAN = auto()
+    def priority(self, stats: NumericalColumnStats) -> int:
+        symmetric = abs(stats.skewness) < 1.0
+        few_outliers = stats.outlier_ratio < 0.05
 
-
-class OutlierSingleStrategy(ABC):
-    @abstractmethod
-    def decide(self, skewness: float, ratio: float, is_target: bool) -> bool: ...
-
-    @abstractmethod
-    def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series: ...
-
-
-class IQRStrategy(OutlierSingleStrategy): ...
-
-
-class WinsorizeStrategy(OutlierSingleStrategy): ...
+        if symmetric and few_outliers:
+            return Priority.OUTLIER_HIGH
+        elif symmetric or few_outliers:
+            return Priority.OUTLIER_MID
+        else:
+            return Priority.OUTLIER_LOW
 
 
-def collect_numerical_stats(data: pd.Series) -> NumericalColumnStats:
-    return NumericalColumnStats(
-        max=data.max(),
-        min=data.min(),
-        mean=data.mean(),
-        median=data.median(),
-        std=data.std(),
-        variance=data.var(),
-        skewness=pd.to_numeric(data.skew(numeric_only=True)),
-        range=np.ptp(data),
-        n_unique=data.nunique(),
-        quantiles={
-            "p5": data.quantile(0.05),
-            "p25": data.quantile(0.25),
-            "p75": data.quantile(0.75),
-            "p95": data.quantile(0.95),
-        },
-    )
+class WinsorizeStrategy(NumericalStrategy):
+    def __init__(self, lower: float = 0.05, upper: float = 0.95) -> None:
+        super().__init__(name="winsorize")
+        self.lower = lower
+        self.upper = upper
+
+    def should_apply(self, stats: NumericalColumnStats, is_target: bool) -> bool:
+        return not is_target and stats.outlier_ratio > 0.01
+
+    def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
+        lo = data.quantile(self.lower)
+        hi = data.quantile(self.upper)
+        return data.clip(lo, hi)
+
+    def priority(self, stats: NumericalColumnStats) -> int:
+        skewed = abs(stats.skewness) >= 1.0
+        many_outliers = stats.outlier_ratio >= 0.05
+
+        if skewed and many_outliers:
+            return Priority.OUTLIER_HIGH
+        elif skewed or many_outliers:
+            return Priority.OUTLIER_MID
+        else:
+            return Priority.OUTLIER_LOW

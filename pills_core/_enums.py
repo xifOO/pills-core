@@ -11,8 +11,8 @@ class TaskType(Enum):
 
 class ColumnRole(Enum):
     TARGET = "target"
-    NUMERIC = "numeric"
-    CATEGORY = "category"
+    NUMERICAL = "numerical"
+    CATEGORICAL = "categorical"
     DATETIME = "datetime"
     DROP = "drop"
     ID = "id"
