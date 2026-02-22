@@ -24,6 +24,8 @@ class NumericalColumnStats:
     outlier_ratio: float
     q1: Numeric
     q3: Numeric
+    p05: Numeric
+    p95: Numeric
 
 
 @dataclass

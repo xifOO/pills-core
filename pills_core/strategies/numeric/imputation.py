@@ -2,8 +2,23 @@ from typing import Callable
 
 import pandas as pd
 
+from pills_core.calculations.fill_fn import (
+    lower_boundary_fill,
+    mean_fill,
+    median_fill,
+    mode_fill,
+    upper_boundary_fill,
+    zero_fill,
+)
+from pills_core.calculations.score_fn import (
+    lower_boundary_score,
+    mean_score,
+    median_score,
+    mode_score,
+    upper_boundary_score,
+    zero_score,
+)
 from pills_core.strategies.numeric.base import NumericalStrategy
-from pills_core.strategies.priorities import Priority
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -30,61 +45,36 @@ class ImputationStrategy(NumericalStrategy):
 
 MEDIAN_IMPUTATION = ImputationStrategy(
     name="median",
-    fill_fn=lambda data, stats: data.fillna(stats.median),
-    score_fn=lambda stats: (
-        Priority.IMPUTATION_HIGH
-        if abs(stats.skewness) >= 1.0 or stats.outlier_ratio > 0.05
-        else Priority.IMPUTATION_LOW
-    ),
+    fill_fn=median_fill,
+    score_fn=median_score,
 )
 
 MEAN_IMPUTATION = ImputationStrategy(
     name="mean",
-    fill_fn=lambda data, stats: data.fillna(stats.mean),
-    score_fn=lambda stats: (
-        Priority.IMPUTATION_HIGH
-        if abs(stats.skewness) < 1.0 and stats.outlier_ratio < 0.05
-        else Priority.IMPUTATION_LOW
-    ),
+    fill_fn=mean_fill,
+    score_fn=mean_score,
 )
 
 MODE_IMPUTATION = ImputationStrategy(
     name="mode",
-    fill_fn=lambda data, stats: data.fillna(stats.mode),
-    score_fn=lambda stats: (
-        Priority.IMPUTATION_HIGH if stats.n_unique <= 10 else Priority.IMPUTATION_LOW
-    ),
+    fill_fn=mode_fill,
+    score_fn=mode_score,
 )
-
 
 ZERO_IMPUTATION = ImputationStrategy(
     name="constant_zero",
-    fill_fn=lambda data, stats: data.fillna(0),
-    score_fn=lambda stats: (
-        Priority.IMPUTATION_HIGH
-        if stats.missing_ratio > 0.3 and stats.min >= 0
-        else Priority.IMPUTATION_LOW
-    ),
+    fill_fn=zero_fill,
+    score_fn=zero_score,
 )
-
 
 UPPER_BOUNDARY_IMPUTATION = ImputationStrategy(
     name="upper_boundary",
-    fill_fn=lambda data, stats: data.fillna(stats.mean + 3 * stats.std),
-    score_fn=lambda stats: (
-        Priority.IMPUTATION_HIGH
-        if stats.skewness > 2.0 and stats.outlier_ratio > 0.05
-        else Priority.IMPUTATION_LOW
-    ),
+    fill_fn=upper_boundary_fill,
+    score_fn=upper_boundary_score,
 )
-
 
 LOWER_BOUNDARY_IMPUTATION = ImputationStrategy(
     name="lower_boundary",
-    fill_fn=lambda data, stats: data.fillna(stats.mean - 3 * stats.std),
-    score_fn=lambda stats: (
-        Priority.IMPUTATION_HIGH
-        if stats.skewness < -2.0 and stats.outlier_ratio > 0.05
-        else Priority.IMPUTATION_LOW
-    ),
+    fill_fn=lower_boundary_fill,
+    score_fn=lower_boundary_score,
 )
