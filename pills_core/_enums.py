@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum, IntEnum
 
 
-class TaskType(Enum):
+class TaskType(StrEnum):
     BINARY = "binary"
     MULTICLASS = "multiclass"
     REGRESSION = "regression"
@@ -9,10 +9,16 @@ class TaskType(Enum):
     AUTO = "auto"
 
 
-class ColumnRole(Enum):
+class ColumnRole(StrEnum):
     TARGET = "target"
     NUMERICAL = "numerical"
     CATEGORICAL = "categorical"
     DATETIME = "datetime"
     DROP = "drop"
     ID = "id"
+
+
+class TransformPhase(IntEnum):
+    IMPUTATION = 1
+    OUTLIER = 2
+    SCALING = 3

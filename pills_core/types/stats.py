@@ -15,6 +15,7 @@ class NumericalColumnStats:
     median: Numeric
     mode: Numeric
     std: Numeric
+    count: int
     variance: Numeric
     skewness: float
     kurtosis: float

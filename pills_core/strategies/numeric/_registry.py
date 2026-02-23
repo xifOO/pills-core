@@ -1,40 +1,47 @@
-from pills_core._enums import ColumnRole
+from pills_core._enums import ColumnRole, TransformPhase
 from pills_core.strategies.numeric.imputation import (
-    LOWER_BOUNDARY_IMPUTATION,
-    MEAN_IMPUTATION,
-    MEDIAN_IMPUTATION,
-    UPPER_BOUNDARY_IMPUTATION,
-    ZERO_IMPUTATION,
-    ImputationStrategy,
+    MeanImputation,
+    MedianImputation,
+    ModeImputation,
+    NumericalImputationStrategy,
+    UpperBoundaryImputation,
+    ZeroImputation,
 )
 from pills_core.strategies.numeric.outliers import (
+    NumericalOutlierStrategy,
     IQRStrategy,
-    OutlierStrategy,
     WinsorizeStrategy,
     ZScoreStrategy,
 )
+from pills_core.strategies.numeric.scaling import LogTransformStrategy, MinMaxScalerStrategy, NumericalScalingStrategy, RobustScalerStrategy, StandardScalerStrategy
 from pills_core.strategies.registry import StrategyRegistry
-from pills_core.types.stats import NumericalColumnStats
 
 
-def build_imputation_registry() -> StrategyRegistry[ImputationStrategy]:
+def build_imputation_registry() -> StrategyRegistry[NumericalImputationStrategy]:
     return (
-        StrategyRegistry[ImputationStrategy](ColumnRole.NUMERICAL)
-        .register(MEDIAN_IMPUTATION)
-        .register(MEAN_IMPUTATION)
-        .register(ZERO_IMPUTATION)
-        .register(UPPER_BOUNDARY_IMPUTATION)
-        .register(LOWER_BOUNDARY_IMPUTATION)
+        StrategyRegistry[NumericalImputationStrategy](ColumnRole.NUMERICAL, TransformPhase.IMPUTATION)
+        .register(MedianImputation())
+        .register(MeanImputation())
+        .register(ModeImputation())
+        .register(ZeroImputation())
+        .register(UpperBoundaryImputation())
     )
 
 
-def build_outliers_registry() -> StrategyRegistry[OutlierStrategy]:
+def build_outliers_registry() -> StrategyRegistry[NumericalOutlierStrategy]:
     return (
-        StrategyRegistry[OutlierStrategy](ColumnRole.NUMERICAL)
+        StrategyRegistry[NumericalOutlierStrategy](ColumnRole.NUMERICAL, TransformPhase.OUTLIER)
         .register(IQRStrategy())
         .register(WinsorizeStrategy())
-        .register(ZScoreStrategy(3.0))  # later to config
+        .register(ZScoreStrategy())
     )
 
 
-def build_scaling_registry() -> StrategyRegistry: ...
+def build_scaling_registry() -> StrategyRegistry[NumericalScalingStrategy]:
+    return (
+        StrategyRegistry[NumericalScalingStrategy](ColumnRole.NUMERICAL, TransformPhase.SCALING)
+        .register(StandardScalerStrategy())
+        .register(MinMaxScalerStrategy())
+        .register(LogTransformStrategy())
+        .register(RobustScalerStrategy())
+    )
