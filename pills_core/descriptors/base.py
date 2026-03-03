@@ -1,10 +1,23 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from dataclasses import dataclass, field
+from typing import Generic, Optional, TypeVar
 
 import pandas as pd
 
+from pills_core._enums import TransformPhase
+
 
 T = TypeVar("T", pd.Series, pd.DataFrame)
+
+
+@dataclass
+class TransformResult:
+    data: pd.Series
+    strategy_name: str
+    phase: TransformPhase
+    before_stats: dict = field(default_factory=dict)
+    after_stats: dict = field(default_factory=dict)
+    notes: Optional[str] = None
 
 
 class Descriptor(ABC, Generic[T]):

@@ -27,6 +27,11 @@ class NumericalColumnStats:
     q3: Numeric
     p05: Numeric
     p95: Numeric
+    is_integer_valued: bool
+    monotonic_ratio: float
+    cv: float  # std / mean
+    unique_ratio: float
+    zero_ratio: float
 
 
 @dataclass

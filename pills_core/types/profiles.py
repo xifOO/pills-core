@@ -18,3 +18,12 @@ class CategoricalProfile:
     has_typos: bool = False
     has_order: bool = False  # low/medium/high
     is_domain_specific: bool = False
+
+
+@dataclass
+class StatisticalProfile:
+    is_skewed: bool
+    is_heavy_tailed: bool
+    has_outliers: bool
+    is_sparse: bool
+    is_low_variance: bool

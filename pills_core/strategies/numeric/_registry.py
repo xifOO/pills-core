@@ -13,13 +13,23 @@ from pills_core.strategies.numeric.outliers import (
     WinsorizeStrategy,
     ZScoreStrategy,
 )
-from pills_core.strategies.numeric.scaling import LogTransformStrategy, MinMaxScalerStrategy, NumericalScalingStrategy, RobustScalerStrategy, StandardScalerStrategy
+from pills_core.strategies.numeric.scaling import (
+    BoxCoxStrategy,
+    LogTransformStrategy,
+    MinMaxScalerStrategy,
+    NumericalScalingStrategy,
+    RobustScalerStrategy,
+    SqrtTransformStrategy,
+    StandardScalerStrategy,
+)
 from pills_core.strategies.registry import StrategyRegistry
 
 
 def build_imputation_registry() -> StrategyRegistry[NumericalImputationStrategy]:
     return (
-        StrategyRegistry[NumericalImputationStrategy](ColumnRole.NUMERICAL, TransformPhase.IMPUTATION)
+        StrategyRegistry[NumericalImputationStrategy](
+            ColumnRole.NUMERICAL, TransformPhase.IMPUTATION
+        )
         .register(MedianImputation())
         .register(MeanImputation())
         .register(ModeImputation())
@@ -30,7 +40,9 @@ def build_imputation_registry() -> StrategyRegistry[NumericalImputationStrategy]
 
 def build_outliers_registry() -> StrategyRegistry[NumericalOutlierStrategy]:
     return (
-        StrategyRegistry[NumericalOutlierStrategy](ColumnRole.NUMERICAL, TransformPhase.OUTLIER)
+        StrategyRegistry[NumericalOutlierStrategy](
+            ColumnRole.NUMERICAL, TransformPhase.OUTLIER
+        )
         .register(IQRStrategy())
         .register(WinsorizeStrategy())
         .register(ZScoreStrategy())
@@ -39,9 +51,13 @@ def build_outliers_registry() -> StrategyRegistry[NumericalOutlierStrategy]:
 
 def build_scaling_registry() -> StrategyRegistry[NumericalScalingStrategy]:
     return (
-        StrategyRegistry[NumericalScalingStrategy](ColumnRole.NUMERICAL, TransformPhase.SCALING)
+        StrategyRegistry[NumericalScalingStrategy](
+            ColumnRole.NUMERICAL, TransformPhase.SCALING
+        )
         .register(StandardScalerStrategy())
         .register(MinMaxScalerStrategy())
         .register(LogTransformStrategy())
         .register(RobustScalerStrategy())
+        .register(BoxCoxStrategy())
+        .register(SqrtTransformStrategy())
     )

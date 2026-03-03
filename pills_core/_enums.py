@@ -1,4 +1,4 @@
-from enum import StrEnum, IntEnum
+from enum import Enum, StrEnum, IntEnum, auto
 
 
 class TaskType(StrEnum):
@@ -15,7 +15,15 @@ class ColumnRole(StrEnum):
     CATEGORICAL = "categorical"
     DATETIME = "datetime"
     DROP = "drop"
-    ID = "id"
+
+
+class SemanticRole(Enum):
+    CONTINUOUS = auto()
+    COUNT = auto()
+    ORDINAL = auto()
+    NUMERIC_NOMINAL = auto()
+    BINARY = auto()
+    ID_LIKE = auto()
 
 
 class TransformPhase(IntEnum):
