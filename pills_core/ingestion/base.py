@@ -12,6 +12,7 @@ class DataSource(ABC, Generic[OptionsT]):
     A base class for data sources.
     This class represents a custom data source that allows for reading.
     """
+
     def __init__(self, options: OptionsT) -> None:
         self.options = options
 
@@ -22,6 +23,3 @@ class DataSource(ABC, Generic[OptionsT]):
     @abstractmethod
     def load(self) -> pd.DataFrame:
         """Load data into a pandas DataFrame."""
-    
-    
-
