@@ -128,14 +128,14 @@ class ZeroImputation(NumericalImputationStrategy):
     family_role: ClassVar[FamilyRole] = FamilyRole.CONSTANT
 
     embedding = StrategyEmbedding(
-        skewness_sensitivity=0.3,
-        outliers_sensitivity=0.1,
+        skewness_sensitivity=0.6,
+        outliers_sensitivity=0.4,
         missing_ratio_fit=0.9,
         distribution_preservation=0.2,
         target_safety=1.0,
         cardinality_fit=0.4,
     )
-    radius = 1.1
+    radius = 1.0
 
     fills_with_existing_value = False
     sensitive_to_outliers = False
