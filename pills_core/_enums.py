@@ -1,17 +1,43 @@
-from enum import Enum
+from enum import Enum, IntEnum, StrEnum, auto
 
 
-class TaskType(Enum):
+class TaskType(StrEnum):
     BINARY = "binary"
     MULTICLASS = "multiclass"
     REGRESSION = "regression"
+    TIME_SERIES = "time_series"
     AUTO = "auto"
 
 
-class ColumnRole(Enum):
+class ColumnRole(StrEnum):
     TARGET = "target"
-    NUMERIC = "numeric"
-    CATEGORY = "category"
+    NUMERICAL = "numerical"
+    CATEGORICAL = "categorical"
     DATETIME = "datetime"
     DROP = "drop"
-    ID = "id"
+
+
+class SemanticRole(Enum):
+    CONTINUOUS = auto()
+    COUNT = auto()
+    ORDINAL = auto()
+    NUMERIC_NOMINAL = auto()
+    BINARY = auto()
+    ID_LIKE = auto()
+
+
+class TransformPhase(IntEnum):
+    IMPUTATION = 1
+    OUTLIER = 2
+    SCALING = 3
+
+
+class FamilyRole(StrEnum):
+    CENTRAL_TENDENCY = auto()
+    CONSTANT = auto()
+    BOUNDARY = auto()
+    STATISTICAL = auto()
+    ROBUST = auto()
+    PERCENTILE = auto()
+    LINEAR_SCALING = auto()
+    SKEW_TRANSFORM = auto()

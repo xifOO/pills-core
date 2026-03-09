@@ -1,0 +1,124 @@
+from abc import ABC, abstractmethod
+from typing import Generic
+
+import pandas as pd
+
+from pills_core._enums import ColumnRole, SemanticRole
+from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
+from pills_core.types.profiles import StatisticalProfile
+from pills_core.types.stats import NumericalColumnStats, StatsT
+
+
+class ColumnAnalyzer(ABC, Generic[StatsT]):
+    @abstractmethod
+    def detect_column_role(self, series: pd.Series) -> ColumnRole: ...
+
+    @abstractmethod
+    def detect_semantic_role(self, stats: StatsT) -> SemanticRole: ...
+
+    @abstractmethod
+    def build_statistical_profile(self, stats: StatsT) -> StatisticalProfile: ...
+
+    @abstractmethod
+    def build_column_embedding(
+        self, stats: StatsT, meta: ColumnMeta
+    ) -> StrategyEmbedding: ...
+
+
+class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
+    ID_UNIQUE_RATIO_THRESHOLD = 0.95
+    ID_MONOTONIC_THRESHOLD = 0.95
+    BINARY_MAX_UNIQUE = 2
+    LOW_UNIQUE_RATIO_THRESHOLD = 0.15
+    LOW_UNIQUE_ABS_THRESHOLD = 20
+    ORDINAL_MAX_SKEWNESS = 1.0
+    COUNT_SKEWNESS_THRESHOLD = 0.5
+    SKEWED_THRESHOLD = 1.0
+    HEAVY_TAIL_KURTOSIS = 3.0
+    SPARSE_MISSING_RATIO = 0.3
+    LOW_VARIANCE_CV_THRESHOLD = 0.01
+
+    def detect_column_role(self, series: pd.Series) -> ColumnRole:
+        if pd.api.types.is_numeric_dtype(series):
+            return ColumnRole.NUMERICAL
+        return ColumnRole.DROP
+
+    def detect_semantic_role(
+        self,
+        stats: NumericalColumnStats,
+    ) -> SemanticRole:
+        if stats.n_unique <= self.BINARY_MAX_UNIQUE:
+            return SemanticRole.BINARY
+
+        if (
+            stats.unique_ratio >= self.ID_UNIQUE_RATIO_THRESHOLD
+            and stats.monotonic_ratio >= self.ID_MONOTONIC_THRESHOLD
+        ):
+            return SemanticRole.ID_LIKE
+
+        if (
+            stats.is_integer_valued
+            and stats.min >= 0
+            and stats.skewness >= self.COUNT_SKEWNESS_THRESHOLD
+            and stats.zero_ratio < 0.95
+        ):
+            return SemanticRole.COUNT
+
+        if (
+            stats.is_integer_valued
+            and stats.min >= 0
+            and stats.zero_ratio >= 0.95
+            and stats.n_unique <= 10
+        ):
+            return SemanticRole.COUNT
+
+        is_low_unique = (
+            stats.unique_ratio <= self.LOW_UNIQUE_RATIO_THRESHOLD
+            and stats.n_unique <= self.LOW_UNIQUE_ABS_THRESHOLD
+        )
+
+        if is_low_unique and stats.is_integer_valued:
+            if abs(stats.skewness) <= self.ORDINAL_MAX_SKEWNESS:
+                return SemanticRole.ORDINAL
+            return SemanticRole.NUMERIC_NOMINAL
+
+        return SemanticRole.CONTINUOUS
+
+    def build_statistical_profile(
+        self,
+        stats: NumericalColumnStats,
+    ) -> StatisticalProfile:
+        return StatisticalProfile(
+            is_skewed=bool(abs(stats.skewness) >= self.SKEWED_THRESHOLD),
+            is_heavy_tailed=bool(stats.kurtosis > self.HEAVY_TAIL_KURTOSIS),
+            has_outliers=stats.outlier_ratio > 0,
+            is_sparse=stats.missing_ratio >= self.SPARSE_MISSING_RATIO,
+            is_low_variance=stats.cv < self.LOW_VARIANCE_CV_THRESHOLD,
+        )
+
+    def build_column_embedding(
+        self,
+        stats: NumericalColumnStats,
+        meta: ColumnMeta,
+    ) -> StrategyEmbedding:
+        skewness_sensitivity = min(abs(stats.skewness) / 3.0, 1.0)
+        outliers_sensitivity = min(stats.outlier_ratio * 5.0, 1.0)
+
+        distribution_preservation = 1.0
+        if meta.profile.is_skewed:
+            distribution_preservation -= 0.4
+        if meta.profile.is_heavy_tailed:
+            distribution_preservation -= 0.3
+        distribution_preservation = max(distribution_preservation, 0.0)
+
+        target_safety = 1.0 if meta.is_target else 0.0
+        cardinality_fit = 1.0 - min(stats.unique_ratio, 1.0)
+
+        return StrategyEmbedding(
+            skewness_sensitivity=skewness_sensitivity,
+            outliers_sensitivity=outliers_sensitivity,
+            missing_ratio_fit=1.0 if stats.missing_ratio > 0 else 0.0,
+            distribution_preservation=distribution_preservation,
+            target_safety=target_safety,
+            cardinality_fit=cardinality_fit,
+        )
