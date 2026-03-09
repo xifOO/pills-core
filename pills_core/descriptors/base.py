@@ -6,7 +6,6 @@ import pandas as pd
 
 from pills_core._enums import TransformPhase
 
-
 T = TypeVar("T", pd.Series, pd.DataFrame)
 
 

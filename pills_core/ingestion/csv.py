@@ -1,9 +1,10 @@
 import csv
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
+from io import StringIO
+
 import numpy as np
 import pandas as pd
-from io import StringIO
 
 from pills_core.ingestion.base import DataSource
 

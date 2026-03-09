@@ -3,7 +3,6 @@ from typing import Generic, TypeVar
 
 import pandas as pd
 
-
 OptionsT = TypeVar("OptionsT")
 
 

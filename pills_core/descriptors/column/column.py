@@ -1,4 +1,5 @@
 import pandas as pd
+
 from pills_core._enums import ColumnRole
 from pills_core.descriptors.base import Descriptor
 

@@ -10,8 +10,8 @@ from pills_core.strategies.numeric.imputation import (
     ZeroImputation,
 )
 from pills_core.strategies.numeric.outliers import (
-    NumericalOutlierStrategy,
     IQRStrategy,
+    NumericalOutlierStrategy,
     WinsorizeStrategy,
     ZScoreStrategy,
 )
@@ -25,7 +25,6 @@ from pills_core.strategies.numeric.scaling import (
     StandardScalerStrategy,
 )
 from pills_core.strategies.registry import StrategyRegistry
-
 
 IMPUTATION_WEIGHTS: Final = {
     "skewness_sensitivity": 0.8,

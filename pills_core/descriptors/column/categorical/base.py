@@ -1,4 +1,5 @@
 import pandas as pd
+
 from pills_core.descriptors.column.column import ColumnDescriptor
 from pills_core.types.profiles import Cardinality, CategoricalProfile
 

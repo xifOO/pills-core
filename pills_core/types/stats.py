@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Union, TypeVar
-
+from typing import List, TypeVar, Union
 
 Numeric = Union[float, int]
 

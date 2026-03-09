@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Generic
+
 import pandas as pd
+
 from pills_core._enums import ColumnRole, SemanticRole
 from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.types.profiles import StatisticalProfile

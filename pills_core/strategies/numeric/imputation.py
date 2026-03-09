@@ -1,10 +1,11 @@
 from typing import ClassVar
 
+import pandas as pd
+
 from pills_core._enums import FamilyRole, TransformPhase
 from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.strategies.numeric.base import NumericalStrategy
 from pills_core.types.stats import NumericalColumnStats
-import pandas as pd
 
 
 class NumericalImputationStrategy(NumericalStrategy):

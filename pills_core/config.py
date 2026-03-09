@@ -1,6 +1,8 @@
 from typing import Optional
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from pills_core._enums import TaskType
 
 
