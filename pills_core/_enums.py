@@ -30,3 +30,14 @@ class TransformPhase(IntEnum):
     IMPUTATION = 1
     OUTLIER = 2
     SCALING = 3
+
+
+class FamilyRole(StrEnum):
+    CENTRAL_TENDENCY = auto()
+    CONSTANT = auto()
+    BOUNDARY = auto()
+    STATISTICAL = auto()
+    ROBUST = auto()
+    PERCENTILE = auto()
+    LINEAR_SCALING = auto()
+    SKEW_TRANSFORM = auto()

@@ -1,9 +1,8 @@
 from typing import ClassVar
 
-from pills_core._enums import SemanticRole, TransformPhase
-from pills_core.strategies.base import ColumnMeta
+from pills_core._enums import FamilyRole, TransformPhase
+from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.strategies.numeric.base import NumericalStrategy
-from pills_core.strategies.score import DecisionScore
 from pills_core.types.stats import NumericalColumnStats
 import pandas as pd
 
@@ -30,7 +29,7 @@ class NumericalImputationStrategy(NumericalStrategy):
     def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
         if not self.safe_for_target and meta.is_target:
             return False
-        if self.sensitive_to_outliers and stats.outlier_ratio > 0.05:
+        if self.sensitive_to_outliers and stats.outlier_ratio > 0.15:
             return False
         if self.sensitive_to_skewness and abs(stats.skewness) > 1.0:
             return False
@@ -48,19 +47,20 @@ class NumericalImputationStrategy(NumericalStrategy):
             parts.append("unsafe for target")
         return " | ".join(parts)
 
-    def _base_meta_penalty(self, meta: ColumnMeta) -> int:
-        penalty = 0
-
-        if not self.safe_for_target and meta.is_target:
-            penalty += 500  # never for target
-
-        if meta.semantic_role == SemanticRole.ID_LIKE:
-            penalty += 500  # never for identifiers
-
-        return penalty
-
 
 class MedianImputation(NumericalImputationStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.9,
+        outliers_sensitivity=0.1,
+        missing_ratio_fit=0.8,
+        distribution_preservation=0.9,
+        target_safety=1.0,
+        cardinality_fit=0.0,
+    )
+    radius = 1.9
+
     fills_with_existing_value = True
     sensitive_to_outliers = False
     sensitive_to_skewness = False
@@ -72,23 +72,20 @@ class MedianImputation(NumericalImputationStrategy):
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.median)
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = self._base_meta_penalty(meta)
-
-        if stats.missing_ratio == 0:
-            penalty += 300
-
-        if abs(stats.skewness) >= 1.0:
-            condition += 100
-
-        if stats.outlier_ratio > 0.05:
-            condition += 75
-
-        return DecisionScore(base=300, condition=condition, penalty=penalty)
-
 
 class MeanImputation(NumericalImputationStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.2,
+        outliers_sensitivity=0.9,
+        missing_ratio_fit=0.7,
+        distribution_preservation=0.8,
+        target_safety=1.0,
+        cardinality_fit=0.5,
+    )
+    radius = 1.2
+
     fills_with_existing_value = True
     sensitive_to_outliers = True
     sensitive_to_skewness = True
@@ -100,23 +97,20 @@ class MeanImputation(NumericalImputationStrategy):
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.mean)
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = self._base_meta_penalty(meta)
-
-        if abs(stats.skewness) < 0.5:
-            condition += 100  # mean == median when symmetric
-
-        if stats.outlier_ratio > 0.05:
-            penalty += 150  # mean is pulled hard by outliers
-
-        if abs(stats.skewness) >= 1.0:
-            penalty += 100
-
-        return DecisionScore(base=300, condition=condition, penalty=penalty)
-
 
 class ModeImputation(NumericalImputationStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.5,
+        outliers_sensitivity=0.1,
+        missing_ratio_fit=0.6,
+        distribution_preservation=0.3,
+        target_safety=1.0,
+        cardinality_fit=0.9,
+    )
+    radius = 1.2
+
     fills_with_existing_value = True
     sensitive_to_outliers = False
     sensitive_to_skewness = False
@@ -128,20 +122,20 @@ class ModeImputation(NumericalImputationStrategy):
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.mode)
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = self._base_meta_penalty(meta)
-
-        if stats.n_unique <= 10:
-            condition += 100  # mode makes sense for low-cardinality
-
-        if stats.n_unique > 20:
-            penalty += 150
-
-        return DecisionScore(base=300, condition=condition, penalty=penalty)
-
 
 class ZeroImputation(NumericalImputationStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.CONSTANT
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.3,
+        outliers_sensitivity=0.1,
+        missing_ratio_fit=0.9,
+        distribution_preservation=0.2,
+        target_safety=1.0,
+        cardinality_fit=0.4,
+    )
+    radius = 1.1
+
     fills_with_existing_value = False
     sensitive_to_outliers = False
     sensitive_to_skewness = False
@@ -153,23 +147,20 @@ class ZeroImputation(NumericalImputationStrategy):
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(0)
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = self._base_meta_penalty(meta)
-
-        if stats.missing_ratio > 0.3:
-            condition += 75  # large gaps — zero is safe fallback
-
-        if stats.min >= 0:
-            condition += 25  # zero is in-domain for non-negative
-
-        if stats.mean > 0 and stats.missing_ratio < 0.1:
-            penalty += 100  # distorts distribution when data is mostly present
-
-        return DecisionScore(base=150, condition=condition, penalty=penalty)
-
 
 class UpperBoundaryImputation(NumericalImputationStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.BOUNDARY
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.8,
+        outliers_sensitivity=0.6,
+        missing_ratio_fit=0.5,
+        distribution_preservation=0.2,
+        target_safety=0.0,
+        cardinality_fit=0.3,
+    )
+    radius = 1.1
+
     fills_with_existing_value = True
     sensitive_to_outliers = True
     sensitive_to_skewness = False
@@ -182,23 +173,20 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.mean + 3 * stats.std)
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = self._base_meta_penalty(meta)
-
-        if stats.skewness > 2.0:
-            condition += 100  # right tail — filling with upper boundary makes sense
-
-        if stats.outlier_ratio > 0.05:
-            condition += 75
-
-        if stats.outlier_ratio > 0.15:
-            penalty += 75  # boundary itself is distorted by too many outliers
-
-        return DecisionScore(base=150, condition=condition, penalty=penalty)
-
 
 class LowerBoundaryImputation(NumericalImputationStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.BOUNDARY
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.8,
+        outliers_sensitivity=0.6,
+        missing_ratio_fit=0.5,
+        distribution_preservation=0.2,
+        target_safety=0.0,
+        cardinality_fit=0.3,
+    )
+    radius = 1.1
+
     fills_with_existing_value = True
     sensitive_to_outliers = True
     sensitive_to_skewness = False
@@ -210,18 +198,3 @@ class LowerBoundaryImputation(NumericalImputationStrategy):
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.mean - 3 * stats.std)
-
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = self._base_meta_penalty(meta)
-
-        if stats.skewness < -2.0:
-            condition += 100  # left tail — filling with lower boundary makes sense
-
-        if stats.outlier_ratio > 0.05:
-            condition += 75
-
-        if stats.outlier_ratio > 0.15:
-            penalty += 75
-
-        return DecisionScore(base=150, condition=condition, penalty=penalty)

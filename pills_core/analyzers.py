@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Generic
 import pandas as pd
 from pills_core._enums import ColumnRole, SemanticRole
+from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.types.profiles import StatisticalProfile
 from pills_core.types.stats import NumericalColumnStats, StatsT
 
@@ -15,6 +16,11 @@ class ColumnAnalyzer(ABC, Generic[StatsT]):
 
     @abstractmethod
     def build_statistical_profile(self, stats: StatsT) -> StatisticalProfile: ...
+
+    @abstractmethod
+    def build_column_embedding(
+        self, stats: StatsT, meta: ColumnMeta
+    ) -> StrategyEmbedding: ...
 
 
 class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
@@ -86,4 +92,31 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
             has_outliers=stats.outlier_ratio > 0,
             is_sparse=stats.missing_ratio >= self.SPARSE_MISSING_RATIO,
             is_low_variance=stats.cv < self.LOW_VARIANCE_CV_THRESHOLD,
+        )
+
+    def build_column_embedding(
+        self,
+        stats: NumericalColumnStats,
+        meta: ColumnMeta,
+    ) -> StrategyEmbedding:
+        skewness_sensitivity = min(abs(stats.skewness) / 3.0, 1.0)
+        outliers_sensitivity = min(stats.outlier_ratio * 5.0, 1.0)
+
+        distribution_preservation = 1.0
+        if meta.profile.is_skewed:
+            distribution_preservation -= 0.4
+        if meta.profile.is_heavy_tailed:
+            distribution_preservation -= 0.3
+        distribution_preservation = max(distribution_preservation, 0.0)
+
+        target_safety = 1.0 if meta.is_target else 0.0
+        cardinality_fit = 1.0 - min(stats.unique_ratio, 1.0)
+
+        return StrategyEmbedding(
+            skewness_sensitivity=skewness_sensitivity,
+            outliers_sensitivity=outliers_sensitivity,
+            missing_ratio_fit=1.0 if stats.missing_ratio > 0 else 0.0,
+            distribution_preservation=distribution_preservation,
+            target_safety=target_safety,
+            cardinality_fit=cardinality_fit,
         )

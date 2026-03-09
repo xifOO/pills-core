@@ -4,10 +4,9 @@ import numpy as np
 import pandas as pd
 from scipy import stats as sstats
 
-from pills_core._enums import SemanticRole, TransformPhase
-from pills_core.strategies.base import ColumnMeta
+from pills_core._enums import FamilyRole, SemanticRole, TransformPhase
+from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.strategies.numeric.base import NumericalStrategy
-from pills_core.strategies.score import DecisionScore
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -25,8 +24,6 @@ class NumericalScalingStrategy(NumericalStrategy):
         return TransformPhase.SCALING
 
     def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
-        if meta.is_target:
-            return False
         if meta.semantic_role in (
             SemanticRole.ID_LIKE,
             SemanticRole.BINARY,
@@ -36,8 +33,6 @@ class NumericalScalingStrategy(NumericalStrategy):
         if self.requires_non_negative and stats.min < 0:
             return False
         if self.assumes_normality and abs(stats.skewness) >= 1.0:
-            return False
-        if self.sensitive_to_outliers and stats.outlier_ratio >= 0.05:
             return False
         return True
 
@@ -55,6 +50,18 @@ class NumericalScalingStrategy(NumericalStrategy):
 
 
 class StandardScalerStrategy(NumericalScalingStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.LINEAR_SCALING
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.1,
+        outliers_sensitivity=0.9,
+        missing_ratio_fit=0.5,
+        distribution_preservation=1.0,
+        target_safety=0.0,
+        cardinality_fit=0.4,
+    )
+    radius = 1.2
+
     sensitive_to_outliers = True
     assumes_normality = True
     preserves_distribution = True
@@ -66,48 +73,20 @@ class StandardScalerStrategy(NumericalScalingStrategy):
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return (data - stats.mean) / stats.std
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = _semantic_role_penalty(meta)
-
-        if abs(stats.skewness) < 0.5:
-            condition += 100  # best when symmetric — mean is accurate center
-
-        if abs(stats.skewness) >= 1.0:
-            penalty += 100  # skew distorts mean → center is wrong
-
-        if abs(stats.skewness) < 0.5 and stats.outlier_ratio < 0.08:
-            condition += 75
-
-        if stats.outlier_ratio < 0.02:
-            condition += 75  # clean data — mean/std are reliable
-
-        if stats.outlier_ratio >= 0.05:
-            penalty += 150  # outliers destroy mean and std completely
-
-        if meta.profile.is_heavy_tailed:
-            penalty += 75  # heavy tails inflate std → unit variance is misleading
-
-        if not meta.profile.is_skewed and not meta.profile.is_heavy_tailed:
-            condition += 50  # well-behaved bell curve — standard scaler is ideal
-
-        if meta.profile.is_low_variance:
-            penalty += 40  # near-zero std → division becomes numerically unstable
-
-        if meta.semantic_role == SemanticRole.CONTINUOUS:
-            condition += (
-                50  # standard scaler is the canonical choice for continuous features
-            )
-
-        if meta.semantic_role == SemanticRole.COUNT:
-            penalty += (
-                50  # counts are skewed and non-negative — mean/std are unreliable
-            )
-
-        return DecisionScore(base=250, condition=condition, penalty=penalty)
-
 
 class MinMaxScalerStrategy(NumericalScalingStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.LINEAR_SCALING
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.3,
+        outliers_sensitivity=1.0,
+        missing_ratio_fit=0.5,
+        distribution_preservation=1.0,
+        target_safety=0.0,
+        cardinality_fit=0.4,
+    )
+    radius = 1.0
+
     sensitive_to_outliers = True  # → should_apply will block if outlier_ratio >= 0.05
     assumes_normality = False
     preserves_distribution = True
@@ -122,44 +101,20 @@ class MinMaxScalerStrategy(NumericalScalingStrategy):
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return (data - stats.min) / (stats.max - stats.min)
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = _semantic_role_penalty(meta)
-
-        if stats.outlier_ratio == 0:
-            condition += 125  # min/max are accurate only without outliers
-
-        if stats.outlier_ratio > 0:
-            penalty += 150  # even one outlier collapses the [0,1] range
-
-        if abs(stats.skewness) < 0.5:
-            condition += 50
-
-        if meta.profile.is_heavy_tailed:
-            penalty += (
-                100  # extreme values dominate the range — most values compress near 0
-            )
-
-        if meta.profile.is_sparse:
-            penalty += (
-                50  # range computed over few values — min/max are not representative
-            )
-
-        if meta.profile.is_low_variance:
-            condition += (
-                40  # tight cluster with no outliers — min/max scaling works well
-            )
-
-        if meta.semantic_role == SemanticRole.CONTINUOUS:
-            condition += 30
-
-        if meta.semantic_role == SemanticRole.COUNT:
-            penalty += 40  # counts often have extreme max values — range gets dominated
-
-        return DecisionScore(base=200, condition=condition, penalty=penalty)
-
 
 class LogTransformStrategy(NumericalScalingStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=1.0,
+        outliers_sensitivity=0.3,
+        missing_ratio_fit=0.5,
+        distribution_preservation=0.1,
+        target_safety=0.0,
+        cardinality_fit=0.6,
+    )
+    radius = 1.1
+
     requires_non_negative = True  # → should_apply will block if min < 0
     preserves_distribution = False
     sensitive_to_outliers = False
@@ -176,46 +131,20 @@ class LogTransformStrategy(NumericalScalingStrategy):
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return pd.Series(np.log1p(data), index=data.index)
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = _semantic_role_penalty(meta)
-
-        if stats.skewness > 3.0:
-            condition += 150  # heavy right tail — log is ideal
-
-        elif stats.skewness > 1.5:
-            condition += 100  # moderate right tail — log helps
-
-        if stats.min == 0:
-            condition += 25  # log1p(0) = 0, zero-safe
-
-        if stats.outlier_ratio > 0.1:
-            penalty += 50  # log compresses but doesn't remove outliers
-
-        if meta.profile.is_heavy_tailed:
-            condition += 75  # log is specifically designed to tame heavy right tails
-
-        if meta.profile.is_sparse:
-            penalty += 30  # few points — hard to verify skew is structural, not noise
-
-        if meta.semantic_role == SemanticRole.COUNT:
-            condition += (
-                175  # counts follow Poisson/power-law — log transform is canonical
-            )
-
-        if meta.semantic_role == SemanticRole.COUNT and stats.zero_ratio > 0.5:
-            condition += 50  # zero-inflated count — log1p
-
-        if meta.semantic_role == SemanticRole.CONTINUOUS:
-            condition += 30  # valid for right-skewed continuous features
-
-        if meta.semantic_role == SemanticRole.ORDINAL:
-            penalty += 50  # log distorts rank spacing in a non-meaningful way
-
-        return DecisionScore(base=150, condition=condition, penalty=penalty)
-
 
 class RobustScalerStrategy(NumericalScalingStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.ROBUST
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.5,
+        outliers_sensitivity=0.1,
+        missing_ratio_fit=0.5,
+        distribution_preservation=0.9,
+        target_safety=0.0,
+        cardinality_fit=0.4,
+    )
+    radius = 1.5
+
     sensitive_to_outliers = False
     assumes_normality = False
     preserves_distribution = True
@@ -230,37 +159,20 @@ class RobustScalerStrategy(NumericalScalingStrategy):
             return data
         return (data - stats.median) / iqr
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = _semantic_role_penalty(meta)
-
-        if stats.outlier_ratio > 0.05:
-            condition += 100  # median/IQR not affected by outliers
-
-        if meta.profile.is_heavy_tailed:
-            condition += 75  # robust scaler shines when tails are extreme
-
-        if meta.profile.has_outliers:
-            condition += (
-                50  # confirmed outliers — median/IQR centering is the right call
-            )
-
-        if meta.profile.is_low_variance:
-            penalty += 60  # IQR near zero → division becomes unstable, same as std=0
-
-        if meta.semantic_role == SemanticRole.CONTINUOUS:
-            condition += 40  # safe general-purpose choice when outliers are present
-
-        if meta.semantic_role == SemanticRole.COUNT:
-            condition += 20  # right-skewed counts with extreme values — robust scaler handles well
-
-        if abs(stats.skewness) > 2.0 and stats.outlier_ratio > 0.05:
-            penalty += 300
-
-        return DecisionScore(base=220, condition=condition, penalty=penalty)
-
 
 class BoxCoxStrategy(NumericalScalingStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=1.0,
+        outliers_sensitivity=0.7,
+        missing_ratio_fit=0.5,
+        distribution_preservation=0.1,
+        target_safety=0.0,
+        cardinality_fit=0.3,
+    )
+    radius = 1.0
+
     requires_non_negative = True  # Box-Cox requires positive values
     preserves_distribution = False  # changes the shape of the distribution
     sensitive_to_outliers = True
@@ -291,38 +203,20 @@ class BoxCoxStrategy(NumericalScalingStrategy):
 
         return pd.Series(transformed, index=data.index)
 
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = _semantic_role_penalty(meta)
-
-        if stats.skewness > 4.0:
-            condition += 175
-
-        elif stats.skewness > 2.0:
-            condition += 100
-
-        if meta.profile.is_heavy_tailed:
-            condition += 100
-
-        if stats.outlier_ratio > 0.1:
-            penalty += 75
-
-        if meta.profile.has_outliers:
-            penalty += 50
-
-        if meta.semantic_role == SemanticRole.CONTINUOUS:
-            condition += 50
-
-        if meta.semantic_role == SemanticRole.COUNT:
-            penalty += 125
-
-        if meta.semantic_role == SemanticRole.ORDINAL:
-            penalty += 100
-
-        return DecisionScore(base=220, condition=condition, penalty=penalty)
-
 
 class SqrtTransformStrategy(NumericalScalingStrategy):
+    family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
+
+    embedding = StrategyEmbedding(
+        skewness_sensitivity=0.7,
+        outliers_sensitivity=0.5,
+        missing_ratio_fit=0.5,
+        distribution_preservation=0.3,
+        target_safety=0.0,
+        cardinality_fit=0.5,
+    )
+    radius = 1.2
+
     requires_non_negative = True
     is_invertible = True
     preserves_distribution = False
@@ -333,52 +227,3 @@ class SqrtTransformStrategy(NumericalScalingStrategy):
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return pd.Series(np.sqrt(data), index=data.index)
-
-    def score(self, meta: ColumnMeta, stats: NumericalColumnStats) -> DecisionScore:
-        condition = 0
-        penalty = _semantic_role_penalty(meta)
-
-        if 1.0 < stats.skewness <= 2.5:
-            condition += 150
-
-        elif stats.skewness > 2.5:
-            condition += 50
-
-        if meta.profile.has_outliers:
-            penalty += 50
-
-        if meta.semantic_role == SemanticRole.COUNT:
-            condition += 80
-
-        if meta.semantic_role == SemanticRole.ORDINAL:
-            penalty += 100
-
-        return DecisionScore(base=200, condition=condition, penalty=penalty)
-
-
-def _semantic_role_penalty(meta: ColumnMeta) -> int:
-    """
-    some semantic roles make scaling actively harmful
-    regardless of the chosen strategy.
-    Returns a penalty to subtract from the score.
-    """
-    role = meta.semantic_role
-    penalty = 0
-
-    # IDs have no meaningful numeric distribution — scaling is nonsensical
-    if role == SemanticRole.ID_LIKE:
-        penalty += 300
-
-    # Binary columns are already in {0, 1} — scaling distorts the encoding
-    if role == SemanticRole.BINARY:
-        penalty += 300
-
-    # Nominal numbers encode categories — scaling implies false ordering
-    if role == SemanticRole.NUMERIC_NOMINAL:
-        penalty += 300
-
-    # Ordinal ranks have meaningful order but not meaningful magnitude
-    if role == SemanticRole.ORDINAL:
-        penalty += 75
-
-    return penalty

@@ -51,12 +51,14 @@ class CSVDataSource(DataSource[CSVOptions]):
             temp_col = series.astype(str).str.strip()
             clean_num = temp_col.str.replace(r"[$%\s]", "", regex=True)
             if self.options.decimal != ".":
-                clean_num = clean_num.str.replace(self.options.decimal, ".", regex=False)
-            
-            parsed = pd.to_numeric(clean_num, errors="coerce") 
+                clean_num = clean_num.str.replace(
+                    self.options.decimal, ".", regex=False
+                )
+
+            parsed = pd.to_numeric(clean_num, errors="coerce")
             if len(series) > 0 and parsed.notna().sum() > len(series) * 0.5:
                 series = parsed.astype(np.float64)
-                
+
         return series
 
     def _header_handling(self, df: pd.DataFrame) -> pd.DataFrame:
