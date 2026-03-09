@@ -1,4 +1,4 @@
-from typing import Dict, Generic, TypeVar
+from typing import Dict, Generic, List, TypeVar
 
 import pandas as pd
 
@@ -70,6 +70,11 @@ class StrategyRegistry(Generic[StrategyT]):
         for strategy in self.resolve(meta, column_embedding, stats):
             result = strategy[0].apply(result, stats)
         return result
+
+    def get_search_space(self, stats) -> Dict[str, List[str]]:
+        """Remove out all impossible strategy combinations
+        before Optuna even tries them."""
+        ...
 
     def explain(
         self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
