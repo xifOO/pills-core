@@ -29,8 +29,8 @@ from pills_core.strategies.registry import StrategyRegistry
 IMPUTATION_WEIGHTS: Final = {
     "skewness_sensitivity": 0.8,
     "outliers_sensitivity": 0.4,
-    "missing_ratio_fit": 2.0,
-    "distribution_preservation": 0.0,
+    "missing_ratio_fit": 1.5,
+    "distribution_preservation": 0.8,
     "target_safety": 0.0,
     "cardinality_fit": 0.5,
 }
