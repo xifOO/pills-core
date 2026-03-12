@@ -1,4 +1,4 @@
-from typing import Dict, Generic, List, TypeVar
+from typing import Dict, Generic, List, Tuple, TypeVar
 
 import pandas as pd
 
@@ -35,17 +35,22 @@ class StrategyRegistry(Generic[StrategyT]):
     def resolve(
         self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
     ) -> list[tuple[StrategyT, float]]:
-        candidates = []
 
-        for s in self._strategies:
-            if s.should_apply(stats, meta):
-                dist = s.distance(column_embedding, self.weights)
+        scored: list[Tuple[StrategyT, float]] = []
 
-                if dist <= s.radius:
-                    candidates.append((s, dist))
+        for strategy in self._strategies:
+            score = strategy.score(
+                column_embedding=column_embedding,
+                stats=stats,
+                meta=meta,
+                weights=self.weights,
+            )
 
-        candidates.sort(key=lambda x: x[1])
-        return candidates
+            if score is not None:
+                scored.append((strategy, score))
+
+        scored.sort(key=lambda x: x[1])
+        return scored
 
     def apply(
         self,

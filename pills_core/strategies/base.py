@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import ClassVar, Dict, Generic
+from typing import ClassVar, Dict, Generic, Optional
 
 import numpy as np
 import pandas as pd
@@ -77,3 +77,21 @@ class SingleStrategy(TransformStrategy[StatsT], Generic[StatsT]):
                 - column_embedding.to_weighted_array(weights)
             )
         )
+
+    def score(
+        self,
+        column_embedding: StrategyEmbedding,
+        stats: StatsT,
+        meta: ColumnMeta,
+        weights: Dict[str, float],
+    ) -> Optional[float]:
+
+        if not self.should_apply(stats, meta):
+            return None
+
+        dist = self.distance(column_embedding, weights)
+
+        if dist > self.radius:
+            return None
+
+        return dist
