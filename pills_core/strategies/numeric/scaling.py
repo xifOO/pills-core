@@ -18,6 +18,7 @@ class NumericalScalingStrategy(NumericalStrategy):
     )
     sensitive_to_outliers: ClassVar[bool] = False
     assumes_normality: ClassVar[bool] = False
+    requires_outliers_removed: ClassVar[bool] = False
 
     @property
     def phase(self) -> TransformPhase:
@@ -66,6 +67,7 @@ class StandardScalerStrategy(NumericalScalingStrategy):
     assumes_normality = True
     preserves_distribution = True
     is_invertible = True
+    requires_outliers_removed = True
 
     def __init__(self) -> None:
         super().__init__(name="standard_scaler")

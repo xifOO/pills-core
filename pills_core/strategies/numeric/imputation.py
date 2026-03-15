@@ -22,6 +22,7 @@ class NumericalImputationStrategy(NumericalStrategy):
     safe_for_target: ClassVar[bool] = (
         True  # it's safe to use on the target variable (y)
     )
+    requires_outliers_removed: ClassVar[bool] = False  # Mean / UpperBoundary only
 
     @property
     def phase(self) -> TransformPhase:
@@ -91,6 +92,7 @@ class MeanImputation(NumericalImputationStrategy):
     sensitive_to_outliers = True
     sensitive_to_skewness = True
     preserves_distribution = True
+    requires_outliers_removed = True
 
     def __init__(self) -> None:
         super().__init__(name="mean")
@@ -167,6 +169,7 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
     sensitive_to_skewness = False
     preserves_distribution = False
     safe_for_target = False
+    requires_outliers_removed = True
 
     def __init__(self) -> None:
         super().__init__(name="upper_boundary")

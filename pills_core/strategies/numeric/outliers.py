@@ -14,6 +14,7 @@ class NumericalOutlierStrategy(NumericalStrategy):
     assumes_normality: ClassVar[bool] = False  # requires normal distribution
     sensitive_to_sample_size: ClassVar[bool] = False  # performs poorly on small samples
     min_sample_size: ClassVar[int] = 0
+    requires_imputed: ClassVar[bool] = True
 
     @property
     def phase(self) -> TransformPhase:
