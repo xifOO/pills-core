@@ -18,7 +18,12 @@ class StrategyRegistry(Generic[StrategyT]):
         self.column_type = column_type
         self.phase = phase
         self.weights = weights
-        self._strategies: list[StrategyT] = []
+        self._strategies: List[StrategyT] = []
+
+    @property
+    def strategies(self) -> List[StrategyT]:
+        # now only for tests
+        return self._strategies
 
     def register(self, strategy: StrategyT) -> "StrategyRegistry[StrategyT]":
         if strategy.column_type != self.column_type:
@@ -34,9 +39,9 @@ class StrategyRegistry(Generic[StrategyT]):
 
     def resolve(
         self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
-    ) -> list[tuple[StrategyT, float]]:
+    ) -> List[Tuple[StrategyT, float]]:
 
-        scored: list[Tuple[StrategyT, float]] = []
+        scored: List[Tuple[StrategyT, float]] = []
 
         for strategy in self._strategies:
             score = strategy.score(
@@ -76,14 +81,19 @@ class StrategyRegistry(Generic[StrategyT]):
             result = strategy[0].apply(result, stats)
         return result
 
-    def get_search_space(self, stats) -> Dict[str, List[str]]:
-        """Remove out all impossible strategy combinations
-        before Optuna even tries them."""
-        ...
+    def get_search_space(
+        self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
+    ) -> Dict[str, List[str]]:
+        """Remove out all impossible strategy combinations before Optuna even tries them."""
+        return {
+            self.phase.value: [
+                s.name for s, _ in self.resolve(meta, column_embedding, stats)
+            ]
+        }
 
     def explain(
         self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
-    ) -> list[str]:
+    ) -> List[str]:
         ordered = self.resolve(meta, column_embedding, stats)
         lines = []
 
