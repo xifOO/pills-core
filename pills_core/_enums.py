@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum, StrEnum, auto
+from enum import Enum, StrEnum, auto
 
 
 class TaskType(StrEnum):
@@ -26,10 +26,10 @@ class SemanticRole(Enum):
     ID_LIKE = auto()
 
 
-class TransformPhase(IntEnum):
-    IMPUTATION = 1
-    OUTLIER = 2
-    SCALING = 3
+class TransformPhase(StrEnum):
+    IMPUTATION = auto()
+    OUTLIER = auto()
+    SCALING = auto()
 
 
 class FamilyRole(StrEnum):
@@ -41,3 +41,17 @@ class FamilyRole(StrEnum):
     PERCENTILE = auto()
     LINEAR_SCALING = auto()
     SKEW_TRANSFORM = auto()
+
+
+class DriftSeverity(StrEnum):
+    STABLE = auto()
+    MODERATE = auto()
+    CRITICAL = auto()
+
+    @classmethod
+    def from_psi(cls, psi: float) -> "DriftSeverity":
+        if psi < 0.1:
+            return cls.STABLE
+        elif psi < 0.2:
+            return cls.MODERATE
+        return cls.CRITICAL
