@@ -31,9 +31,9 @@ class StatisticalProfile:
 
 @dataclass
 class DomainProfile:
-    is_ratio: bool        
-    is_monetary: bool    
-    is_rate: bool         
-    is_bounded: bool      
+    is_ratio: bool
+    is_monetary: bool
+    is_rate: bool
+    is_bounded: bool
     lower_bound: float | None
     upper_bound: float | None

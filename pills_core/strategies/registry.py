@@ -95,8 +95,10 @@ class StrategyRegistry(Generic[StrategyT]):
             status = (
                 "✓"
                 if (applies and domain_ok and in_radius)
-                else "✗ radius" if (applies and domain_ok)
-                else "✗ domain" if (applies and not domain_ok)
+                else "✗ radius"
+                if (applies and domain_ok)
+                else "✗ domain"
+                if (applies and not domain_ok)
                 else "✗ should_apply"
             )
             all_distances.append((s, dist, status))
@@ -121,4 +123,3 @@ class StrategyRegistry(Generic[StrategyT]):
             lines.append(f"[{self.phase.name}] No applicable strategies found.")
 
         return lines
-    

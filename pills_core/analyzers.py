@@ -45,26 +45,49 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
 
     _DOMAIN_KEYWORDS: Final = {
         "monetary": {
-            "amnt", "amount", "bal", "balance", "limit",
-            "installment", "recoveries", "fee", "payment",
-            "pymnt", "prncp", "inv"
+            "amnt",
+            "amount",
+            "bal",
+            "balance",
+            "limit",
+            "installment",
+            "recoveries",
+            "fee",
+            "payment",
+            "pymnt",
+            "prncp",
+            "inv",
         },
         "rate": {
-            "int_rate", "revol_util", "il_util", "bc_util",
-            "all_util", "sec_app_revol_util", "pct", "percent",
-            "dti", "rate"
+            "int_rate",
+            "revol_util",
+            "il_util",
+            "bc_util",
+            "all_util",
+            "sec_app_revol_util",
+            "pct",
+            "percent",
+            "dti",
+            "rate",
         },
-        "ratio": {
-            "dti", "util", "pct", "percent"
-        },
-        "score": {
-            "fico", "grade"
-        },
+        "ratio": {"dti", "util", "pct", "percent"},
+        "score": {"fico", "grade"},
         "count": {
-            "acc", "inq", "delinq", "rec", "tl",
-            "mths", "mo_sin", "num_", "open_", "pub_rec",
-            "collections", "bankruptcies", "liens", "term"
-        }
+            "acc",
+            "inq",
+            "delinq",
+            "rec",
+            "tl",
+            "mths",
+            "mo_sin",
+            "num_",
+            "open_",
+            "pub_rec",
+            "collections",
+            "bankruptcies",
+            "liens",
+            "term",
+        },
     }
 
     def detect_column_role(self, series: pd.Series) -> ColumnRole:
@@ -165,10 +188,7 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
         is_score = self._matches(name, self._DOMAIN_KEYWORDS["score"])
 
         is_stat_bounded = (
-            stats.min >= 0
-            and stats.max <= 1.0
-            and not is_monetary
-            and not is_score
+            stats.min >= 0 and stats.max <= 1.0 and not is_monetary and not is_score
         )
         is_bounded = is_rate or is_ratio or is_score or is_stat_bounded
 

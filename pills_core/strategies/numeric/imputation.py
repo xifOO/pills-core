@@ -150,7 +150,7 @@ class ZeroImputation(NumericalImputationStrategy):
     def is_domain_valid(self, meta: ColumnMeta) -> bool:
         if meta.semantic_role in (SemanticRole.COUNT, SemanticRole.CONTINUOUS):
             return False
-        
+
         if meta.domain_profile.is_monetary:
             return False
 
@@ -184,9 +184,12 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
         super().__init__(name="upper_boundary")
 
     def is_domain_valid(self, meta: ColumnMeta) -> bool:
-        if meta.domain_profile.is_bounded and meta.domain_profile.upper_bound is not None:
+        if (
+            meta.domain_profile.is_bounded
+            and meta.domain_profile.upper_bound is not None
+        ):
             return False
-        
+
         return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
@@ -218,10 +221,13 @@ class LowerBoundaryImputation(NumericalImputationStrategy):
     def is_domain_valid(self, meta: ColumnMeta) -> bool:
         if meta.domain_profile.is_monetary or meta.domain_profile.is_rate:
             return False
-        
-        if meta.domain_profile.lower_bound is not None and meta.domain_profile.lower_bound >= 0:
+
+        if (
+            meta.domain_profile.lower_bound is not None
+            and meta.domain_profile.lower_bound >= 0
+        ):
             return False
-        
+
         return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:

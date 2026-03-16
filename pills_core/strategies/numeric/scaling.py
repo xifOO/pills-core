@@ -137,9 +137,12 @@ class LogTransformStrategy(NumericalScalingStrategy):
         return super().should_apply(stats, meta) and stats.skewness > 1.5
 
     def is_domain_valid(self, meta: ColumnMeta) -> bool:
-        if meta.domain_profile.lower_bound is not None and meta.domain_profile.lower_bound < 0:
+        if (
+            meta.domain_profile.lower_bound is not None
+            and meta.domain_profile.lower_bound < 0
+        ):
             return False
-        
+
         if meta.domain_profile.is_rate or meta.domain_profile.is_ratio:
             return False
 
@@ -206,9 +209,12 @@ class BoxCoxStrategy(NumericalScalingStrategy):
         return super().should_apply(stats, meta)
 
     def is_domain_valid(self, meta: ColumnMeta) -> bool:
-        if meta.domain_profile.lower_bound is not None and meta.domain_profile.lower_bound < 0:
+        if (
+            meta.domain_profile.lower_bound is not None
+            and meta.domain_profile.lower_bound < 0
+        ):
             return False
-        
+
         if meta.domain_profile.is_rate or meta.domain_profile.is_ratio:
             return False
 

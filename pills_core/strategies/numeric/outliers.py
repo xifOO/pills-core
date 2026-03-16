@@ -75,9 +75,12 @@ class IQRStrategy(NumericalOutlierStrategy):
         )
 
     def is_domain_valid(self, meta: ColumnMeta) -> bool:
-        if meta.domain_profile.is_bounded and meta.domain_profile.upper_bound is not None:
+        if (
+            meta.domain_profile.is_bounded
+            and meta.domain_profile.upper_bound is not None
+        ):
             return False
-        
+
         return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
@@ -143,7 +146,7 @@ class WinsorizeStrategy(NumericalOutlierStrategy):
     def is_domain_valid(self, meta: ColumnMeta) -> bool:
         if meta.is_target and meta.domain_profile.is_bounded:
             return False
-        
+
         return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
