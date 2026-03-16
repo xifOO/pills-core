@@ -69,18 +69,6 @@ class StrategyRegistry(Generic[StrategyT]):
             return data
         return ordered[0][0].apply(data, stats)
 
-    def apply_all(
-        self,
-        data: pd.Series,
-        meta: ColumnMeta,
-        column_embedding: StrategyEmbedding,
-        stats,
-    ) -> pd.Series:
-        result = data
-        for strategy in self.resolve(meta, column_embedding, stats):
-            result = strategy[0].apply(result, stats)
-        return result
-
     def get_search_space(
         self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
     ) -> Dict[str, List[str]]:
@@ -100,12 +88,16 @@ class StrategyRegistry(Generic[StrategyT]):
         all_distances = []
         for s in self._strategies:
             applies = s.should_apply(stats, meta)
+            domain_ok = s.is_domain_valid(meta)
             dist = s.distance(column_embedding, self.weights)
             in_radius = dist <= s.radius
+
             status = (
                 "✓"
-                if (applies and in_radius)
-                else ("✗ radius" if applies else "✗ should_apply")
+                if (applies and domain_ok and in_radius)
+                else "✗ radius" if (applies and domain_ok)
+                else "✗ domain" if (applies and not domain_ok)
+                else "✗ should_apply"
             )
             all_distances.append((s, dist, status))
         all_distances.sort(key=lambda x: x[1])
@@ -129,3 +121,4 @@ class StrategyRegistry(Generic[StrategyT]):
             lines.append(f"[{self.phase.name}] No applicable strategies found.")
 
         return lines
+    
