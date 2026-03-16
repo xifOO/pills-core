@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Generic
+from typing import Final, Generic
 
 import pandas as pd
 
 from pills_core._enums import ColumnRole, SemanticRole
 from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
-from pills_core.types.profiles import StatisticalProfile
+from pills_core.types.profiles import DomainProfile, StatisticalProfile
 from pills_core.types.stats import NumericalColumnStats, StatsT
 
 
@@ -24,6 +24,11 @@ class ColumnAnalyzer(ABC, Generic[StatsT]):
         self, stats: StatsT, meta: ColumnMeta
     ) -> StrategyEmbedding: ...
 
+    @abstractmethod
+    def build_domain_profile(
+        self, column_name: str, stats: StatsT
+    ) -> DomainProfile: ...
+
 
 class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
     ID_UNIQUE_RATIO_THRESHOLD = 0.95
@@ -37,6 +42,30 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
     HEAVY_TAIL_KURTOSIS = 3.0
     SPARSE_MISSING_RATIO = 0.3
     LOW_VARIANCE_CV_THRESHOLD = 0.01
+
+    _DOMAIN_KEYWORDS: Final = {
+        "monetary": {
+            "amnt", "amount", "bal", "balance", "limit",
+            "installment", "recoveries", "fee", "payment",
+            "pymnt", "prncp", "inv"
+        },
+        "rate": {
+            "int_rate", "revol_util", "il_util", "bc_util",
+            "all_util", "sec_app_revol_util", "pct", "percent",
+            "dti", "rate"
+        },
+        "ratio": {
+            "dti", "util", "pct", "percent"
+        },
+        "score": {
+            "fico", "grade"
+        },
+        "count": {
+            "acc", "inq", "delinq", "rec", "tl",
+            "mths", "mo_sin", "num_", "open_", "pub_rec",
+            "collections", "bankruptcies", "liens", "term"
+        }
+    }
 
     def detect_column_role(self, series: pd.Series) -> ColumnRole:
         if pd.api.types.is_numeric_dtype(series):
@@ -122,3 +151,42 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
             target_safety=target_safety,
             cardinality_fit=cardinality_fit,
         )
+
+    def build_domain_profile(
+        self,
+        column_name: str,
+        stats: NumericalColumnStats,
+    ) -> DomainProfile:
+        name = column_name.lower()
+
+        is_monetary = self._matches(name, self._DOMAIN_KEYWORDS["monetary"])
+        is_rate = self._matches(name, self._DOMAIN_KEYWORDS["rate"])
+        is_ratio = self._matches(name, self._DOMAIN_KEYWORDS["ratio"])
+        is_score = self._matches(name, self._DOMAIN_KEYWORDS["score"])
+
+        is_stat_bounded = (
+            stats.min >= 0
+            and stats.max <= 1.0
+            and not is_monetary
+            and not is_score
+        )
+        is_bounded = is_rate or is_ratio or is_score or is_stat_bounded
+
+        lower_bound = 0.0 if is_monetary or is_bounded else None
+
+        if is_rate or is_ratio:
+            upper_bound = 100.0 if stats.max > 1.0 else 1.0
+        else:
+            upper_bound = None
+
+        return DomainProfile(
+            is_ratio=is_ratio,
+            is_monetary=is_monetary,
+            is_rate=is_rate,
+            is_bounded=is_bounded,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
+        )
+
+    def _matches(self, name: str, keywords: set[str]) -> bool:
+        return any(kw in name for kw in keywords)

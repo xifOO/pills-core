@@ -2,7 +2,7 @@ from typing import ClassVar
 
 import pandas as pd
 
-from pills_core._enums import FamilyRole, TransformPhase
+from pills_core._enums import FamilyRole, SemanticRole, TransformPhase
 from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.strategies.numeric.base import NumericalStrategy
 from pills_core.types.stats import NumericalColumnStats
@@ -147,6 +147,15 @@ class ZeroImputation(NumericalImputationStrategy):
     def __init__(self) -> None:
         super().__init__(name="constant_zero")
 
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.semantic_role in (SemanticRole.COUNT, SemanticRole.CONTINUOUS):
+            return False
+        
+        if meta.domain_profile.is_monetary:
+            return False
+
+        return True
+
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(0)
 
@@ -174,6 +183,12 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
     def __init__(self) -> None:
         super().__init__(name="upper_boundary")
 
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.domain_profile.is_bounded and meta.domain_profile.upper_bound is not None:
+            return False
+        
+        return True
+
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.mean + 3 * stats.std)
 
@@ -199,6 +214,15 @@ class LowerBoundaryImputation(NumericalImputationStrategy):
 
     def __init__(self) -> None:
         super().__init__(name="lower_boundary")
+
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.domain_profile.is_monetary or meta.domain_profile.is_rate:
+            return False
+        
+        if meta.domain_profile.lower_bound is not None and meta.domain_profile.lower_bound >= 0:
+            return False
+        
+        return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.mean - 3 * stats.std)

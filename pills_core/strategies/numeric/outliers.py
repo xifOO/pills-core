@@ -74,6 +74,12 @@ class IQRStrategy(NumericalOutlierStrategy):
             not meta.is_target and abs(stats.skewness) < 1.5 and stats.outlier_ratio > 0
         )
 
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.domain_profile.is_bounded and meta.domain_profile.upper_bound is not None:
+            return False
+        
+        return True
+
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         iqr = stats.q3 - stats.q1
         return data.clip(lower=stats.q1 - 1.5 * iqr, upper=stats.q3 + 1.5 * iqr)
@@ -133,6 +139,12 @@ class WinsorizeStrategy(NumericalOutlierStrategy):
 
     def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
         return super().should_apply(stats, meta) and stats.outlier_ratio > 0.01
+
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.is_target and meta.domain_profile.is_bounded:
+            return False
+        
+        return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.clip(stats.p05, stats.p95)

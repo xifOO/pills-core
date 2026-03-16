@@ -100,6 +100,12 @@ class MinMaxScalerStrategy(NumericalScalingStrategy):
     def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
         return super().should_apply(stats, meta) and (stats.max - stats.min) > 0
 
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.domain_profile.is_monetary:
+            return False
+
+        return True
+
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return (data - stats.min) / (stats.max - stats.min)
 
@@ -129,6 +135,15 @@ class LogTransformStrategy(NumericalScalingStrategy):
         if meta.semantic_role == SemanticRole.COUNT and stats.min >= 0:
             return True
         return super().should_apply(stats, meta) and stats.skewness > 1.5
+
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.domain_profile.lower_bound is not None and meta.domain_profile.lower_bound < 0:
+            return False
+        
+        if meta.domain_profile.is_rate or meta.domain_profile.is_ratio:
+            return False
+
+        return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return pd.Series(np.log1p(data), index=data.index)
@@ -190,6 +205,15 @@ class BoxCoxStrategy(NumericalScalingStrategy):
 
         return super().should_apply(stats, meta)
 
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.domain_profile.lower_bound is not None and meta.domain_profile.lower_bound < 0:
+            return False
+        
+        if meta.domain_profile.is_rate or meta.domain_profile.is_ratio:
+            return False
+
+        return True
+
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         values: np.ndarray = data.to_numpy(dtype=np.float64, copy=True)
 
@@ -226,6 +250,12 @@ class SqrtTransformStrategy(NumericalScalingStrategy):
 
     def __init__(self) -> None:
         super().__init__(name="sqrt_transform")
+
+    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+        if meta.domain_profile.is_rate or meta.domain_profile.is_ratio:
+            return False
+
+        return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return pd.Series(np.sqrt(data), index=data.index)
