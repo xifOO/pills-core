@@ -221,7 +221,7 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
         )
 
     def _infer_task_type(self, stats: NumericalColumnStats) -> TaskType:
-        if stats.n_unique == 2 or stats.is_integer_valued:
+        if stats.n_unique == 2 and stats.is_integer_valued:
             return TaskType.BINARY
 
         if (
