@@ -89,6 +89,7 @@ class StrategyRegistry(Generic[StrategyT]):
         for s in self._strategies:
             applies = s.should_apply(stats, meta)
             domain_ok = s.is_domain_valid(meta)
+            task_type_ok = s.is_task_valid(meta)
             dist = s.distance(column_embedding, self.weights)
             in_radius = dist <= s.radius
 
@@ -98,6 +99,8 @@ class StrategyRegistry(Generic[StrategyT]):
                 else "✗ radius"
                 if (applies and domain_ok)
                 else "✗ domain"
+                if (applies and task_type_ok)
+                else "✗ task_type"
                 if (applies and not domain_ok)
                 else "✗ should_apply"
             )

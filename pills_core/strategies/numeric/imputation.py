@@ -2,7 +2,7 @@ from typing import ClassVar
 
 import pandas as pd
 
-from pills_core._enums import FamilyRole, SemanticRole, TransformPhase
+from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
 from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.strategies.numeric.base import NumericalStrategy
 from pills_core.types.stats import NumericalColumnStats
@@ -71,6 +71,12 @@ class MedianImputation(NumericalImputationStrategy):
     def __init__(self) -> None:
         super().__init__(name="median")
 
+    def is_task_valid(self, meta: ColumnMeta) -> bool:
+        if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
+            return False
+
+        return True
+
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.median)
 
@@ -97,6 +103,12 @@ class MeanImputation(NumericalImputationStrategy):
     def __init__(self) -> None:
         super().__init__(name="mean")
 
+    def is_task_valid(self, meta: ColumnMeta) -> bool:
+        if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
+            return False
+
+        return True
+
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.mean)
 
@@ -121,6 +133,12 @@ class ModeImputation(NumericalImputationStrategy):
 
     def __init__(self) -> None:
         super().__init__(name="mode")
+
+    def is_task_valid(self, meta: ColumnMeta) -> bool:
+        if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
+            return False
+
+        return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return data.fillna(stats.mode)

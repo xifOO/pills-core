@@ -5,7 +5,13 @@ from typing import ClassVar, Dict, Generic, Optional
 import numpy as np
 import pandas as pd
 
-from pills_core._enums import ColumnRole, FamilyRole, SemanticRole, TransformPhase
+from pills_core._enums import (
+    ColumnRole,
+    FamilyRole,
+    SemanticRole,
+    TaskType,
+    TransformPhase,
+)
 from pills_core.types.profiles import DomainProfile, StatisticalProfile
 from pills_core.types.stats import StatsT
 
@@ -17,6 +23,7 @@ class ColumnMeta:
     profile: StatisticalProfile
     is_target: bool
     domain_profile: DomainProfile
+    task_type: TaskType
 
 
 @dataclass
@@ -54,6 +61,9 @@ class TransformStrategy(ABC, Generic[StatsT]):
     def is_domain_valid(self, meta: ColumnMeta) -> bool: ...
 
     @abstractmethod
+    def is_task_valid(self, meta: ColumnMeta) -> bool: ...
+
+    @abstractmethod
     def should_apply(self, stats: StatsT, meta: ColumnMeta) -> bool: ...
 
     @abstractmethod
@@ -71,9 +81,6 @@ class SingleStrategy(TransformStrategy[StatsT], Generic[StatsT]):
 
     def __init__(self, name: str) -> None:
         self.name = name
-
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
-        return True
 
     def distance(
         self, column_embedding: StrategyEmbedding, weights: Dict[str, float]
@@ -97,6 +104,9 @@ class SingleStrategy(TransformStrategy[StatsT], Generic[StatsT]):
             return None
 
         if not self.is_domain_valid(meta):
+            return None
+
+        if not self.is_task_valid(meta):
             return None
 
         dist = self.distance(column_embedding, weights)

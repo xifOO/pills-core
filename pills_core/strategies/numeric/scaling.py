@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats as sstats
 
-from pills_core._enums import FamilyRole, SemanticRole, TransformPhase
+from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
 from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.strategies.numeric.base import NumericalStrategy
 from pills_core.types.stats import NumericalColumnStats
@@ -146,6 +146,11 @@ class LogTransformStrategy(NumericalScalingStrategy):
         if meta.domain_profile.is_rate or meta.domain_profile.is_ratio:
             return False
 
+        return True
+
+    def is_task_valid(self, meta: ColumnMeta) -> bool:
+        if meta.is_target and meta.task_type == TaskType.BINARY:
+            return False
         return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
