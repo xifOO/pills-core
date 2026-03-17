@@ -3,7 +3,7 @@ from typing import Final, Generic
 
 import pandas as pd
 
-from pills_core._enums import ColumnRole, SemanticRole
+from pills_core._enums import ColumnRole, SemanticRole, TaskType
 from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
 from pills_core.types.profiles import DomainProfile, StatisticalProfile
 from pills_core.types.stats import NumericalColumnStats, StatsT
@@ -28,6 +28,15 @@ class ColumnAnalyzer(ABC, Generic[StatsT]):
     def build_domain_profile(
         self, column_name: str, stats: StatsT
     ) -> DomainProfile: ...
+
+    def resolve_task_type(self, stats: StatsT, task_type: TaskType) -> TaskType:
+        if task_type != TaskType.AUTO:
+            return task_type
+
+        return self._infer_task_type(stats)
+
+    @abstractmethod
+    def _infer_task_type(self, stats: StatsT) -> TaskType: ...
 
 
 class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
@@ -98,7 +107,7 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
     def detect_semantic_role(
         self,
         stats: NumericalColumnStats,
-    ) -> SemanticRole:
+    ) -> SemanticRole:  # later need domain profile
         if stats.n_unique <= self.BINARY_MAX_UNIQUE:
             return SemanticRole.BINARY
 
@@ -182,10 +191,13 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
     ) -> DomainProfile:
         name = column_name.lower()
 
-        is_monetary = self._matches(name, self._DOMAIN_KEYWORDS["monetary"])
-        is_rate = self._matches(name, self._DOMAIN_KEYWORDS["rate"])
-        is_ratio = self._matches(name, self._DOMAIN_KEYWORDS["ratio"])
-        is_score = self._matches(name, self._DOMAIN_KEYWORDS["score"])
+        def matches(name: str, keywords: set[str]) -> bool:
+            return any(kw in name for kw in keywords)
+
+        is_monetary = matches(name, self._DOMAIN_KEYWORDS["monetary"])
+        is_rate = matches(name, self._DOMAIN_KEYWORDS["rate"])
+        is_ratio = matches(name, self._DOMAIN_KEYWORDS["ratio"])
+        is_score = matches(name, self._DOMAIN_KEYWORDS["score"])
 
         is_stat_bounded = (
             stats.min >= 0 and stats.max <= 1.0 and not is_monetary and not is_score
@@ -208,5 +220,23 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
             upper_bound=upper_bound,
         )
 
-    def _matches(self, name: str, keywords: set[str]) -> bool:
-        return any(kw in name for kw in keywords)
+    def _infer_task_type(self, stats: NumericalColumnStats) -> TaskType:
+        if stats.n_unique == 2 or stats.is_integer_valued:
+            return TaskType.BINARY
+
+        if (
+            stats.unique_ratio <= self.LOW_UNIQUE_RATIO_THRESHOLD
+            and stats.is_integer_valued
+            and stats.n_unique <= self.LOW_UNIQUE_ABS_THRESHOLD
+        ):
+            return TaskType.MULTICLASS
+
+        if (
+            stats.unique_ratio > self.LOW_UNIQUE_RATIO_THRESHOLD
+            or abs(stats.skewness) > self.SKEWED_THRESHOLD
+            or stats.outlier_ratio > 0.01
+            or stats.kurtosis > self.HEAVY_TAIL_KURTOSIS
+        ):
+            return TaskType.REGRESSION
+
+        return TaskType.REGRESSION
