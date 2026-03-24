@@ -12,7 +12,11 @@ from pills_core._enums import (
     TaskType,
     TransformPhase,
 )
-from pills_core.types.profiles import DomainProfile, StatisticalProfile
+from pills_core.types.profiles import (
+    CategoricalProfile,
+    DomainProfile,
+    StatisticalProfile,
+)
 from pills_core.types.stats import StatsT
 
 
@@ -24,6 +28,7 @@ class ColumnMeta:
     is_target: bool
     domain_profile: DomainProfile
     task_type: TaskType
+    categorical_profile: CategoricalProfile | None = None
 
 
 @dataclass
