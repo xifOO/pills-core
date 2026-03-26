@@ -2,6 +2,7 @@ from typing import Final
 
 from pills_core._enums import ColumnRole, TransformPhase
 from pills_core.strategies.numeric.imputation import (
+    LowerBoundaryImputation,
     MeanImputation,
     MedianImputation,
     ModeImputation,
@@ -55,38 +56,36 @@ SCALING_WEIGHTS: Final = {
 
 
 def build_imputation_registry() -> StrategyRegistry[NumericalImputationStrategy]:
-    return (
-        StrategyRegistry[NumericalImputationStrategy](
-            ColumnRole.NUMERICAL, TransformPhase.IMPUTATION, IMPUTATION_WEIGHTS
-        )
-        .register(MedianImputation())
-        .register(MeanImputation())
-        .register(ModeImputation())
-        .register(ZeroImputation())
-        .register(UpperBoundaryImputation())
+    return StrategyRegistry[NumericalImputationStrategy](
+        ColumnRole.NUMERICAL, TransformPhase.IMPUTATION, IMPUTATION_WEIGHTS
+    ).bulk_register(
+        [
+            MedianImputation(),
+            MeanImputation(),
+            ModeImputation(),
+            ZeroImputation(),
+            UpperBoundaryImputation(),
+            LowerBoundaryImputation(),
+        ]
     )
 
 
 def build_outliers_registry() -> StrategyRegistry[NumericalOutlierStrategy]:
-    return (
-        StrategyRegistry[NumericalOutlierStrategy](
-            ColumnRole.NUMERICAL, TransformPhase.OUTLIER, OUTLIER_WEIGHTS
-        )
-        .register(IQRStrategy())
-        .register(WinsorizeStrategy())
-        .register(ZScoreStrategy())
-    )
+    return StrategyRegistry[NumericalOutlierStrategy](
+        ColumnRole.NUMERICAL, TransformPhase.OUTLIER, OUTLIER_WEIGHTS
+    ).bulk_register([IQRStrategy(), WinsorizeStrategy(), ZScoreStrategy()])
 
 
 def build_scaling_registry() -> StrategyRegistry[NumericalScalingStrategy]:
-    return (
-        StrategyRegistry[NumericalScalingStrategy](
-            ColumnRole.NUMERICAL, TransformPhase.SCALING, SCALING_WEIGHTS
-        )
-        .register(StandardScalerStrategy())
-        .register(MinMaxScalerStrategy())
-        .register(LogTransformStrategy())
-        .register(RobustScalerStrategy())
-        .register(BoxCoxStrategy())
-        .register(SqrtTransformStrategy())
+    return StrategyRegistry[NumericalScalingStrategy](
+        ColumnRole.NUMERICAL, TransformPhase.SCALING, SCALING_WEIGHTS
+    ).bulk_register(
+        [
+            StandardScalerStrategy(),
+            MinMaxScalerStrategy(),
+            LogTransformStrategy(),
+            RobustScalerStrategy(),
+            BoxCoxStrategy(),
+            SqrtTransformStrategy(),
+        ]
     )

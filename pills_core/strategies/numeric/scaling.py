@@ -5,8 +5,8 @@ import pandas as pd
 from scipy import stats as sstats
 
 from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
-from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
-from pills_core.strategies.numeric.base import NumericalStrategy
+from pills_core.strategies.base import StrategyEmbedding
+from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -24,7 +24,9 @@ class NumericalScalingStrategy(NumericalStrategy):
     def phase(self) -> TransformPhase:
         return TransformPhase.SCALING
 
-    def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
+    def should_apply(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> bool:
         if meta.semantic_role in (
             SemanticRole.ID_LIKE,
             SemanticRole.BINARY,
@@ -51,6 +53,7 @@ class NumericalScalingStrategy(NumericalStrategy):
 
 
 class StandardScalerStrategy(NumericalScalingStrategy):
+    name: ClassVar[str] = "standard_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.LINEAR_SCALING
 
     embedding = StrategyEmbedding(
@@ -69,14 +72,12 @@ class StandardScalerStrategy(NumericalScalingStrategy):
     is_invertible = True
     requires_outliers_removed = True
 
-    def __init__(self) -> None:
-        super().__init__(name="standard_scaler")
-
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return (data - stats.mean) / stats.std
 
 
 class MinMaxScalerStrategy(NumericalScalingStrategy):
+    name: ClassVar[str] = "min_max_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.LINEAR_SCALING
 
     embedding = StrategyEmbedding(
@@ -94,13 +95,12 @@ class MinMaxScalerStrategy(NumericalScalingStrategy):
     preserves_distribution = True
     is_invertible = True
 
-    def __init__(self) -> None:
-        super().__init__(name="min_max_scaler")
-
-    def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
+    def should_apply(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> bool:
         return super().should_apply(stats, meta) and (stats.max - stats.min) > 0
 
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.domain_profile.is_monetary:
             return False
 
@@ -111,6 +111,7 @@ class MinMaxScalerStrategy(NumericalScalingStrategy):
 
 
 class LogTransformStrategy(NumericalScalingStrategy):
+    name: ClassVar[str] = "log_transform"
     family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
 
     embedding = StrategyEmbedding(
@@ -128,15 +129,14 @@ class LogTransformStrategy(NumericalScalingStrategy):
     sensitive_to_outliers = False
     is_invertible = True
 
-    def __init__(self):
-        super().__init__(name="log_transform")
-
-    def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
+    def should_apply(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> bool:
         if meta.semantic_role == SemanticRole.COUNT and stats.min >= 0:
             return True
         return super().should_apply(stats, meta) and stats.skewness > 1.5
 
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if (
             meta.domain_profile.lower_bound is not None
             and meta.domain_profile.lower_bound < 0
@@ -148,7 +148,7 @@ class LogTransformStrategy(NumericalScalingStrategy):
 
         return True
 
-    def is_task_valid(self, meta: ColumnMeta) -> bool:
+    def is_task_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.is_target and meta.task_type == TaskType.BINARY:
             return False
         return True
@@ -158,6 +158,7 @@ class LogTransformStrategy(NumericalScalingStrategy):
 
 
 class RobustScalerStrategy(NumericalScalingStrategy):
+    name: ClassVar[str] = "robust_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.ROBUST
 
     embedding = StrategyEmbedding(
@@ -175,9 +176,6 @@ class RobustScalerStrategy(NumericalScalingStrategy):
     preserves_distribution = True
     is_invertible = True
 
-    def __init__(self) -> None:
-        super().__init__(name="robust_scaler")
-
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         iqr = stats.q3 - stats.q1
         if iqr == 0:
@@ -186,6 +184,7 @@ class RobustScalerStrategy(NumericalScalingStrategy):
 
 
 class BoxCoxStrategy(NumericalScalingStrategy):
+    name: ClassVar[str] = "box_cox"
     family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
 
     embedding = StrategyEmbedding(
@@ -204,16 +203,17 @@ class BoxCoxStrategy(NumericalScalingStrategy):
     is_invertible = False  # currently not invertible
 
     def __init__(self) -> None:
-        super().__init__(name="box_cox")
         self.shift_: float = 0.0
 
-    def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
+    def should_apply(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> bool:
         if stats.skewness <= 1.5:
             return False
 
         return super().should_apply(stats, meta)
 
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if (
             meta.domain_profile.lower_bound is not None
             and meta.domain_profile.lower_bound < 0
@@ -242,6 +242,7 @@ class BoxCoxStrategy(NumericalScalingStrategy):
 
 
 class SqrtTransformStrategy(NumericalScalingStrategy):
+    name: ClassVar[str] = "sqrt_transform"
     family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
 
     embedding = StrategyEmbedding(
@@ -259,10 +260,7 @@ class SqrtTransformStrategy(NumericalScalingStrategy):
     preserves_distribution = False
     sensitive_to_outliers = True
 
-    def __init__(self) -> None:
-        super().__init__(name="sqrt_transform")
-
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.domain_profile.is_rate or meta.domain_profile.is_ratio:
             return False
 

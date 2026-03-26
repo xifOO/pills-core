@@ -3,8 +3,8 @@ from typing import ClassVar
 import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TransformPhase
-from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
-from pills_core.strategies.numeric.base import NumericalStrategy
+from pills_core.strategies.base import StrategyEmbedding
+from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -20,7 +20,9 @@ class NumericalOutlierStrategy(NumericalStrategy):
     def phase(self) -> TransformPhase:
         return TransformPhase.OUTLIER
 
-    def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
+    def should_apply(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> bool:
         if meta.semantic_role in (
             SemanticRole.ID_LIKE,
             SemanticRole.BINARY,
@@ -49,6 +51,7 @@ class NumericalOutlierStrategy(NumericalStrategy):
 
 
 class IQRStrategy(NumericalOutlierStrategy):
+    name: ClassVar[str] = "iqr"
     family_role: ClassVar[FamilyRole] = FamilyRole.ROBUST
 
     embedding = StrategyEmbedding(
@@ -66,15 +69,14 @@ class IQRStrategy(NumericalOutlierStrategy):
     assumes_normality = False
     sensitive_to_sample_size = False
 
-    def __init__(self) -> None:
-        super().__init__(name="iqr")
-
-    def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
+    def should_apply(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> bool:
         return (
             not meta.is_target and abs(stats.skewness) < 1.5 and stats.outlier_ratio > 0
         )
 
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if (
             meta.domain_profile.is_bounded
             and meta.domain_profile.upper_bound is not None
@@ -89,6 +91,7 @@ class IQRStrategy(NumericalOutlierStrategy):
 
 
 class ZScoreStrategy(NumericalOutlierStrategy):
+    name: ClassVar[str] = "z-score"
     family_role: ClassVar[FamilyRole] = FamilyRole.STATISTICAL
 
     embedding = StrategyEmbedding(
@@ -109,7 +112,6 @@ class ZScoreStrategy(NumericalOutlierStrategy):
 
     def __init__(self, threshold: float = 3.0) -> None:
         self.threshold = threshold
-        super().__init__(name="z-score")
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         lower = stats.mean - self.threshold * stats.std
@@ -119,6 +121,7 @@ class ZScoreStrategy(NumericalOutlierStrategy):
 
 
 class WinsorizeStrategy(NumericalOutlierStrategy):
+    name: ClassVar[str] = "winsorize"
     family_role: ClassVar[FamilyRole] = FamilyRole.PERCENTILE
 
     embedding = StrategyEmbedding(
@@ -137,13 +140,12 @@ class WinsorizeStrategy(NumericalOutlierStrategy):
     sensitive_to_sample_size = True  # percentiles are unstable on small samples
     min_sample_size = 20
 
-    def __init__(self) -> None:
-        super().__init__(name="winsorize")
-
-    def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
+    def should_apply(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> bool:
         return super().should_apply(stats, meta) and stats.outlier_ratio > 0.01
 
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.is_target and meta.domain_profile.is_bounded:
             return False
 

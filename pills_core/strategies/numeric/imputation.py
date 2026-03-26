@@ -4,7 +4,7 @@ import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
 from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
-from pills_core.strategies.numeric.base import NumericalStrategy
+from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -51,6 +51,7 @@ class NumericalImputationStrategy(NumericalStrategy):
 
 
 class MedianImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "median"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
 
     embedding = StrategyEmbedding(
@@ -68,10 +69,7 @@ class MedianImputation(NumericalImputationStrategy):
     sensitive_to_skewness = False
     preserves_distribution = True
 
-    def __init__(self) -> None:
-        super().__init__(name="median")
-
-    def is_task_valid(self, meta: ColumnMeta) -> bool:
+    def is_task_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
             return False
 
@@ -82,6 +80,7 @@ class MedianImputation(NumericalImputationStrategy):
 
 
 class MeanImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "mean"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
 
     embedding = StrategyEmbedding(
@@ -100,10 +99,7 @@ class MeanImputation(NumericalImputationStrategy):
     preserves_distribution = True
     requires_outliers_removed = True
 
-    def __init__(self) -> None:
-        super().__init__(name="mean")
-
-    def is_task_valid(self, meta: ColumnMeta) -> bool:
+    def is_task_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
             return False
 
@@ -114,6 +110,7 @@ class MeanImputation(NumericalImputationStrategy):
 
 
 class ModeImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "mode"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
 
     embedding = StrategyEmbedding(
@@ -131,10 +128,7 @@ class ModeImputation(NumericalImputationStrategy):
     sensitive_to_skewness = False
     preserves_distribution = False  # artificially inflates the mode frequency
 
-    def __init__(self) -> None:
-        super().__init__(name="mode")
-
-    def is_task_valid(self, meta: ColumnMeta) -> bool:
+    def is_task_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
             return False
 
@@ -145,6 +139,7 @@ class ModeImputation(NumericalImputationStrategy):
 
 
 class ZeroImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "constant_zero"
     family_role: ClassVar[FamilyRole] = FamilyRole.CONSTANT
 
     embedding = StrategyEmbedding(
@@ -162,10 +157,7 @@ class ZeroImputation(NumericalImputationStrategy):
     sensitive_to_skewness = False
     preserves_distribution = False
 
-    def __init__(self) -> None:
-        super().__init__(name="constant_zero")
-
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.semantic_role in (SemanticRole.COUNT, SemanticRole.CONTINUOUS):
             return False
 
@@ -179,6 +171,7 @@ class ZeroImputation(NumericalImputationStrategy):
 
 
 class UpperBoundaryImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "upper_boundary"
     family_role: ClassVar[FamilyRole] = FamilyRole.BOUNDARY
 
     embedding = StrategyEmbedding(
@@ -198,10 +191,7 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
     safe_for_target = False
     requires_outliers_removed = True
 
-    def __init__(self) -> None:
-        super().__init__(name="upper_boundary")
-
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if (
             meta.domain_profile.is_bounded
             and meta.domain_profile.upper_bound is not None
@@ -215,6 +205,7 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
 
 
 class LowerBoundaryImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "lower_boundary"
     family_role: ClassVar[FamilyRole] = FamilyRole.BOUNDARY
 
     embedding = StrategyEmbedding(
@@ -233,10 +224,7 @@ class LowerBoundaryImputation(NumericalImputationStrategy):
     preserves_distribution = False
     safe_for_target = False
 
-    def __init__(self) -> None:
-        super().__init__(name="lower_boundary")
-
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.domain_profile.is_monetary or meta.domain_profile.is_rate:
             return False
 

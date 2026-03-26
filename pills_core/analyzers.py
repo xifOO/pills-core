@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import inspect
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Generic, Mapping, Type, TypeVar
+from typing import Any, Generic, Mapping
 
 import pandas as pd
 
 from pills_core._enums import ColumnRole, SemanticRole, TaskType
-from pills_core.analyzer_rules import (
+from pills_core.exceptions import AmbiguousAnalyzerError, NoAnalyzerFoundError
+from pills_core.rules import (
     Decision,
     DomainPolicy,
     DomainRule,
@@ -16,16 +16,16 @@ from pills_core.analyzer_rules import (
     MatchPolicy,
     MatchRule,
 )
-from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
+from pills_core.strategies.base import ColumnMeta, MetaT, StrategyEmbedding
+from pills_core.strategies.categorical.base import CategoricalColumnMeta
+from pills_core.strategies.numeric.base import NumericalColumnMeta
 from pills_core.types.profiles import (
     Cardinality,
     CategoricalProfile,
     DomainProfile,
     StatisticalProfile,
 )
-from pills_core.types.stats import CategoricalColumnStats, NumericalColumnStats
-
-StatsT = TypeVar("StatsT", NumericalColumnStats, CategoricalColumnStats)
+from pills_core.types.stats import CategoricalColumnStats, NumericalColumnStats, StatsT
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +89,7 @@ def build_analyzer_config(payload: Mapping[str, Any]) -> AnalyzerConfig:
 
     if "thresholds" in numerical_payload:
         numerical_payload = numerical_payload["thresholds"]
+
     if "thresholds" in categorical_payload:
         categorical_payload = categorical_payload["thresholds"]
 
@@ -99,34 +100,67 @@ def build_analyzer_config(payload: Mapping[str, Any]) -> AnalyzerConfig:
     )
 
 
-def build_domain_config(payload: Mapping[str, Any]) -> DomainConfig:
-    rules_payload = payload.get("rules")
-    if rules_payload is not None:
-        return DomainConfig(
-            rules=tuple(build_domain_rule_config(rule) for rule in rules_payload)
-        )
+def _build_domain_config_from_rules(
+    rules_payload: list[Mapping[str, Any]],
+) -> DomainConfig:
+    return DomainConfig(
+        rules=tuple(build_domain_rule_config(rule) for rule in rules_payload)
+    )
 
-    keywords_payload = payload.get("keywords", payload)
-    if not isinstance(keywords_payload, Mapping):
-        return DomainConfig()
 
-    generated_rules = []
+def _build_domain_config_from_keywords(
+    keywords_payload: Mapping[str, Any],
+) -> DomainConfig:
+    """
+    Legacy shorthand format::
+
+        {"ratio": ["ratio", "share"], "monetary": ["amount", "balance"]}
+
+    Each key becomes a rule whose single tag is ``is_<key>``.
+    Raises UnknownDomainTagError if the key does not map to a known tag.
+    """
+    rules: list[DomainRuleConfig] = []
     for name, keywords in keywords_payload.items():
-        generated_rules.append(
+        tag_name = f"is_{name}"
+        tags = DomainTags.from_tag_name(tag_name)  # raises if unknown
+        rules.append(
             DomainRuleConfig(
                 name=str(name),
-                keywords=tuple(str(keyword) for keyword in keywords),
-                tags=DomainTags(**{f"is_{name}": True}),
+                keywords=tuple(str(k) for k in keywords),
+                tags=tags,
             )
         )
-    return DomainConfig(rules=tuple(generated_rules))
+    return DomainConfig(rules=tuple(rules))
+
+
+def build_domain_config(payload: Mapping[str, Any]) -> DomainConfig:
+    """
+    Accepts two payload shapes:
+
+    1. ``{"rules": [...]}``  — explicit rule list (preferred).
+    2. ``{"ratio": [...], "monetary": [...]}``  — legacy keyword shorthand.
+
+    An empty mapping returns an empty DomainConfig.
+    """
+    if not payload:
+        return DomainConfig()
+
+    rules_payload = payload.get("rules")
+    if rules_payload is not None:
+        return _build_domain_config_from_rules(rules_payload)
+
+    keywords_payload = payload.get("keywords", payload)
+    if isinstance(keywords_payload, Mapping):
+        return _build_domain_config_from_keywords(keywords_payload)
+
+    return DomainConfig()
 
 
 def build_domain_rule_config(payload: Mapping[str, Any]) -> DomainRuleConfig:
     tags_payload = payload.get("tags", {})
     return DomainRuleConfig(
         name=str(payload["name"]),
-        keywords=tuple(str(keyword) for keyword in payload.get("keywords", ())),
+        keywords=tuple(str(k) for k in payload.get("keywords", ())),
         tags=DomainTags(
             is_ratio=bool(tags_payload.get("is_ratio", False)),
             is_monetary=bool(tags_payload.get("is_monetary", False)),
@@ -208,7 +242,9 @@ def build_numerical_semantic_policy(
             MatchRule(
                 name="binary",
                 value=SemanticRole.BINARY,
-                predicate=lambda ctx: ctx.stats.n_unique <= thresholds.binary_max_unique,
+                predicate=lambda ctx: (
+                    ctx.stats.n_unique <= thresholds.binary_max_unique
+                ),
                 reason_builder=lambda ctx: (
                     (
                         f"n_unique={ctx.stats.n_unique} <= "
@@ -312,7 +348,7 @@ def build_numerical_task_policy(
                 predicate=lambda ctx: (
                     ctx.stats.n_unique == 2 and ctx.stats.is_integer_valued
                 ),
-                reason_builder=lambda ctx: (
+                reason_builder=lambda _: (
                     "Target has exactly two integer-coded classes.",
                 ),
             ),
@@ -346,7 +382,9 @@ def build_categorical_semantic_policy(
             MatchRule(
                 name="binary",
                 value=SemanticRole.BINARY,
-                predicate=lambda ctx: ctx.stats.n_unique <= thresholds.binary_max_unique,
+                predicate=lambda ctx: (
+                    ctx.stats.n_unique <= thresholds.binary_max_unique
+                ),
                 reason_builder=lambda ctx: (
                     (
                         f"n_unique={ctx.stats.n_unique} <= "
@@ -374,7 +412,9 @@ def build_categorical_semantic_policy(
             MatchRule(
                 name="nominal_low_cardinality",
                 value=SemanticRole.NUMERIC_NOMINAL,
-                predicate=lambda ctx: ctx.stats.n_unique <= thresholds.low_cardinality_max,
+                predicate=lambda ctx: (
+                    ctx.stats.n_unique <= thresholds.low_cardinality_max
+                ),
                 reason_builder=lambda ctx: (
                     "Low-cardinality categories are treated as nominal by default.",
                     (
@@ -385,9 +425,7 @@ def build_categorical_semantic_policy(
             ),
         ),
         fallback_value=SemanticRole.NUMERIC_NOMINAL,
-        fallback_reasons=(
-            "Higher-cardinality categorical values default to nominal.",
-        ),
+        fallback_reasons=("Higher-cardinality categorical values default to nominal.",),
     )
 
 
@@ -399,8 +437,10 @@ def build_categorical_task_policy(
             MatchRule(
                 name="binary_target",
                 value=TaskType.BINARY,
-                predicate=lambda ctx: ctx.stats.n_unique <= thresholds.binary_max_unique,
-                reason_builder=lambda ctx: ("Target has two categories.",),
+                predicate=lambda ctx: (
+                    ctx.stats.n_unique <= thresholds.binary_max_unique
+                ),
+                reason_builder=lambda _: ("Target has two categories.",),
             ),
         ),
         fallback_value=TaskType.MULTICLASS,
@@ -452,9 +492,7 @@ class DomainProfiler:
         )
 
 
-class ColumnAnalyzer(ABC, Generic[StatsT]):
-    _registered_types: ClassVar[tuple[Type["ColumnAnalyzer[Any]"], ...]] = ()
-
+class ColumnAnalyzer(ABC, Generic[StatsT, MetaT]):
     def __init__(
         self,
         config: AnalyzerConfig | None = None,
@@ -464,34 +502,6 @@ class ColumnAnalyzer(ABC, Generic[StatsT]):
         self.config = config or default_analyzer_config()
         self.domain_policy = domain_policy or build_domain_policy(self.config.domain)
         self.domain_profiler = domain_profiler or DomainProfiler()
-
-    def __init_subclass__(cls, *, register: bool = True, **kwargs) -> None:
-        super().__init_subclass__(**kwargs)
-        if register and not inspect.isabstract(cls):
-            ColumnAnalyzer._registered_types = (
-                *ColumnAnalyzer._registered_types,
-                cls,
-            )
-
-    @classmethod
-    def registered_types(cls) -> tuple[type["ColumnAnalyzer[Any]"], ...]:
-        return cls._registered_types
-
-    @classmethod
-    def create_registered(
-        cls,
-        config: AnalyzerConfig | None = None,
-        domain_policy: DomainPolicy | None = None,
-        domain_profiler: DomainProfiler | None = None,
-    ) -> tuple["ColumnAnalyzer[Any]", ...]:
-        return tuple(
-            analyzer_type(
-                config=config,
-                domain_policy=domain_policy,
-                domain_profiler=domain_profiler,
-            )
-            for analyzer_type in cls.registered_types()
-        )
 
     @property
     @abstractmethod
@@ -513,7 +523,7 @@ class ColumnAnalyzer(ABC, Generic[StatsT]):
     def build_column_embedding(
         self,
         stats: StatsT,
-        meta: ColumnMeta,
+        meta: MetaT,
     ) -> StrategyEmbedding: ...
 
     @abstractmethod
@@ -548,7 +558,9 @@ class ColumnAnalyzer(ABC, Generic[StatsT]):
         return [f"Resolved task type: {decision.value.value}.", *decision.reasons]
 
 
-class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
+class NumericalColumnAnalyzer(
+    ColumnAnalyzer[NumericalColumnStats, NumericalColumnMeta]
+):
     def __init__(
         self,
         config: AnalyzerConfig | None = None,
@@ -602,7 +614,7 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
     def build_column_embedding(
         self,
         stats: NumericalColumnStats,
-        meta: ColumnMeta,
+        meta: NumericalColumnMeta,
     ) -> StrategyEmbedding:
         skewness_sensitivity = min(abs(stats.skewness) / 3.0, 1.0)
         outliers_sensitivity = min(stats.outlier_ratio * 5.0, 1.0)
@@ -629,9 +641,9 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
         stats: NumericalColumnStats,
         is_target: bool,
         task_type: TaskType = TaskType.AUTO,
-    ) -> ColumnMeta:
+    ) -> NumericalColumnMeta:
         domain_tags = self.domain_policy.resolve(str(series.name))
-        return ColumnMeta(
+        return NumericalColumnMeta(
             role=self.detect_column_role(series),
             semantic_role=self.detect_semantic_role(stats),
             profile=self.build_statistical_profile(stats),
@@ -644,13 +656,16 @@ class NumericalColumnAnalyzer(ColumnAnalyzer[NumericalColumnStats]):
         return self.task_policy.resolve(NumericalRuleContext(stats=stats))
 
 
-class CategoricalColumnAnalyzer(ColumnAnalyzer[CategoricalColumnStats]):
+class CategoricalColumnAnalyzer(
+    ColumnAnalyzer[CategoricalColumnStats, CategoricalColumnMeta]
+):
     def __init__(
         self,
         config: AnalyzerConfig | None = None,
         domain_policy: DomainPolicy | None = None,
         domain_profiler: DomainProfiler | None = None,
-        semantic_policy: MatchPolicy[CategoricalRuleContext, SemanticRole] | None = None,
+        semantic_policy: MatchPolicy[CategoricalRuleContext, SemanticRole]
+        | None = None,
         task_policy: MatchPolicy[CategoricalRuleContext, TaskType] | None = None,
     ) -> None:
         super().__init__(
@@ -717,27 +732,20 @@ class CategoricalColumnAnalyzer(ColumnAnalyzer[CategoricalColumnStats]):
             rare_categories=list(stats.rare_categories),
             has_typos=False,
             has_order=self.detect_semantic_role(stats) is SemanticRole.ORDINAL,
-            is_domain_specific=any(
-                (
-                    domain_tags.is_ratio,
-                    domain_tags.is_monetary,
-                    domain_tags.is_rate,
-                    domain_tags.is_score,
-                )
-            ),
+            is_domain_specific=domain_tags.any_set(),
         )
 
     def build_column_embedding(
         self,
         stats: CategoricalColumnStats,
-        meta: ColumnMeta,
+        meta: CategoricalColumnMeta,
     ) -> StrategyEmbedding:
         thresholds = self.config.categorical
         return StrategyEmbedding(
             skewness_sensitivity=min(1.0 - min(stats.entropy / 5.0, 1.0), 1.0),
             outliers_sensitivity=min(stats.rare_ratio * 5.0, 1.0),
             missing_ratio_fit=min(stats.missing_ratio * 2.0, 1.0),
-            distribution_preservation=1.0 if not meta.profile.is_low_variance else 0.5,
+            distribution_preservation=1.0,
             target_safety=1.0 if meta.is_target else 0.2,
             cardinality_fit=min(
                 stats.n_unique / thresholds.medium_cardinality_max,
@@ -751,16 +759,15 @@ class CategoricalColumnAnalyzer(ColumnAnalyzer[CategoricalColumnStats]):
         stats: CategoricalColumnStats,
         is_target: bool,
         task_type: TaskType = TaskType.AUTO,
-    ) -> ColumnMeta:
+    ) -> CategoricalColumnMeta:
         domain_tags = self.domain_policy.resolve(str(series.name))
-        return ColumnMeta(
+        return CategoricalColumnMeta(
             role=self.detect_column_role(series),
             semantic_role=self.detect_semantic_role(stats),
-            profile=self.build_statistical_profile(stats),
             is_target=is_target,
             domain_profile=self.domain_profiler.build_for_categorical(domain_tags),
             task_type=self.resolve_task_type(stats, task_type),
-            categorical_profile=self.build_categorical_profile(stats, domain_tags),
+            profile=self.build_categorical_profile(stats, domain_tags),
         )
 
     def _infer_task_type(self, stats: CategoricalColumnStats) -> Decision[TaskType]:
@@ -770,29 +777,29 @@ class CategoricalColumnAnalyzer(ColumnAnalyzer[CategoricalColumnStats]):
 class AnalyzerRegistry:
     def __init__(
         self,
-        analyzers: tuple[ColumnAnalyzer[Any], ...] | None = None,
         config: AnalyzerConfig | None = None,
         domain_policy: DomainPolicy | None = None,
         domain_profiler: DomainProfiler | None = None,
     ) -> None:
-        self.analyzers = analyzers or ColumnAnalyzer.create_registered(
-            config=config,
-            domain_policy=domain_policy,
-            domain_profiler=domain_profiler,
-        )
+        config = config or default_analyzer_config()
+        domain_policy = domain_policy or build_domain_policy(config.domain)
+        domain_profiler = domain_profiler or DomainProfiler()
 
-    def get_analyzer(self, series: pd.Series) -> ColumnAnalyzer[Any]:
-        matches = [
-            analyzer for analyzer in self.analyzers if analyzer.can_analyze(series)
+        self._analyzers: list[ColumnAnalyzer] = [
+            NumericalColumnAnalyzer(config, domain_policy, domain_profiler),
+            CategoricalColumnAnalyzer(config, domain_policy, domain_profiler),
         ]
 
+    def get_analyzer(self, series: pd.Series) -> ColumnAnalyzer:
+        matches = [a for a in self._analyzers if a.can_analyze(series)]
+
         if not matches:
-            raise ValueError(f"No analyzer registered for column '{series.name}'")
-        
+            raise NoAnalyzerFoundError(str(series.name))
+
         if len(matches) > 1:
-            analyzer_names = ", ".join(type(analyzer).__name__ for analyzer in matches)
-            raise ValueError(
-                f"Ambiguous analyzers for column '{series.name}': {analyzer_names}"
+            raise AmbiguousAnalyzerError(
+                column_name=str(series.name),
+                analyzer_names=[type(a).__name__ for a in matches],
             )
-        
+
         return matches[0]

@@ -25,7 +25,7 @@ class StrategyRegistry(Generic[StrategyT]):
         # now only for tests
         return self._strategies
 
-    def register(self, strategy: StrategyT) -> "StrategyRegistry[StrategyT]":
+    def _register(self, strategy: StrategyT) -> "StrategyRegistry[StrategyT]":
         if strategy.column_type != self.column_type:
             raise TypeError(
                 f"Strategy {strategy.__class__.__name__} should be for {strategy.column_type}."
@@ -35,6 +35,11 @@ class StrategyRegistry(Generic[StrategyT]):
                 f"Strategy '{strategy.name}' belongs to phase {strategy.phase}."
             )
         self._strategies.append(strategy)
+        return self
+
+    def bulk_register(self, strategies: List[StrategyT]):
+        for s in strategies:
+            self._register(s)
         return self
 
     def resolve(
