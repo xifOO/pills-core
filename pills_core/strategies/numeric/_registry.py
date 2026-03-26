@@ -1,6 +1,7 @@
 from typing import Final
 
 from pills_core._enums import ColumnRole, TransformPhase
+from pills_core.strategies.numeric.base import NumericalColumnMeta
 from pills_core.strategies.numeric.imputation import (
     LowerBoundaryImputation,
     MeanImputation,
@@ -26,6 +27,7 @@ from pills_core.strategies.numeric.scaling import (
     StandardScalerStrategy,
 )
 from pills_core.strategies.registry import StrategyRegistry
+from pills_core.types.stats import NumericalColumnStats
 
 IMPUTATION_WEIGHTS: Final = {
     "skewness_sensitivity": 0.8,
@@ -55,8 +57,8 @@ SCALING_WEIGHTS: Final = {
 }
 
 
-def build_imputation_registry() -> StrategyRegistry[NumericalImputationStrategy]:
-    return StrategyRegistry[NumericalImputationStrategy](
+def build_imputation_registry() -> StrategyRegistry[NumericalImputationStrategy, NumericalColumnStats, NumericalColumnMeta]:
+    return StrategyRegistry[NumericalImputationStrategy, NumericalColumnStats, NumericalColumnMeta](
         ColumnRole.NUMERICAL, TransformPhase.IMPUTATION, IMPUTATION_WEIGHTS
     ).bulk_register(
         [
@@ -70,14 +72,14 @@ def build_imputation_registry() -> StrategyRegistry[NumericalImputationStrategy]
     )
 
 
-def build_outliers_registry() -> StrategyRegistry[NumericalOutlierStrategy]:
-    return StrategyRegistry[NumericalOutlierStrategy](
+def build_outliers_registry() -> StrategyRegistry[NumericalOutlierStrategy, NumericalColumnStats, NumericalColumnMeta]:
+    return StrategyRegistry[NumericalOutlierStrategy, NumericalColumnStats, NumericalColumnMeta](
         ColumnRole.NUMERICAL, TransformPhase.OUTLIER, OUTLIER_WEIGHTS
     ).bulk_register([IQRStrategy(), WinsorizeStrategy(), ZScoreStrategy()])
 
 
-def build_scaling_registry() -> StrategyRegistry[NumericalScalingStrategy]:
-    return StrategyRegistry[NumericalScalingStrategy](
+def build_scaling_registry() -> StrategyRegistry[NumericalScalingStrategy, NumericalColumnStats, NumericalColumnMeta]:
+    return StrategyRegistry[NumericalScalingStrategy, NumericalColumnStats, NumericalColumnMeta](
         ColumnRole.NUMERICAL, TransformPhase.SCALING, SCALING_WEIGHTS
     ).bulk_register(
         [

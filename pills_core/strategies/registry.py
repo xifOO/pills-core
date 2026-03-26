@@ -3,12 +3,13 @@ from typing import Dict, Generic, List, Tuple, TypeVar
 import pandas as pd
 
 from pills_core._enums import ColumnRole, TransformPhase
-from pills_core.strategies.base import ColumnMeta, SingleStrategy, StrategyEmbedding
+from pills_core.strategies.base import MetaT, SingleStrategy, StrategyEmbedding
+from pills_core.types.stats import StatsT
 
 StrategyT = TypeVar("StrategyT", bound="SingleStrategy")
 
 
-class StrategyRegistry(Generic[StrategyT]):
+class StrategyRegistry(Generic[StrategyT, StatsT, MetaT]):
     def __init__(
         self,
         column_type: ColumnRole,
@@ -25,7 +26,7 @@ class StrategyRegistry(Generic[StrategyT]):
         # now only for tests
         return self._strategies
 
-    def _register(self, strategy: StrategyT) -> "StrategyRegistry[StrategyT]":
+    def _register(self, strategy: StrategyT) -> "StrategyRegistry[StrategyT, StatsT, MetaT]":
         if strategy.column_type != self.column_type:
             raise TypeError(
                 f"Strategy {strategy.__class__.__name__} should be for {strategy.column_type}."
@@ -43,7 +44,7 @@ class StrategyRegistry(Generic[StrategyT]):
         return self
 
     def resolve(
-        self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
+        self, meta: MetaT, column_embedding: StrategyEmbedding, stats: StatsT
     ) -> List[Tuple[StrategyT, float]]:
 
         scored: List[Tuple[StrategyT, float]] = []
@@ -65,9 +66,9 @@ class StrategyRegistry(Generic[StrategyT]):
     def apply(
         self,
         data: pd.Series,
-        meta: ColumnMeta,
+        meta: MetaT,
         column_embedding: StrategyEmbedding,
-        stats,
+        stats: StatsT,
     ) -> pd.Series:
         ordered = self.resolve(meta, column_embedding, stats)
         if not ordered:
@@ -75,7 +76,7 @@ class StrategyRegistry(Generic[StrategyT]):
         return ordered[0][0].apply(data, stats)
 
     def get_search_space(
-        self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
+        self, meta: MetaT, column_embedding: StrategyEmbedding, stats: StatsT
     ) -> Dict[str, List[str]]:
         """Remove out all impossible strategy combinations before Optuna even tries them."""
         return {
@@ -85,7 +86,7 @@ class StrategyRegistry(Generic[StrategyT]):
         }
 
     def explain(
-        self, meta: ColumnMeta, column_embedding: StrategyEmbedding, stats
+        self, meta: MetaT, column_embedding: StrategyEmbedding, stats: StatsT
     ) -> List[str]:
         ordered = self.resolve(meta, column_embedding, stats)
         lines = []
