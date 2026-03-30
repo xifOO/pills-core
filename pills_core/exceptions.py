@@ -1,4 +1,6 @@
-from pills_core.rules import _DOMAIN_TAG_FIELDS
+_DOMAIN_TAG_FIELDS: frozenset[str] = frozenset(
+    {"is_ratio", "is_monetary", "is_rate", "is_score"}
+)
 
 
 class AnalyzerError(Exception):

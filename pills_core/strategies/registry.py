@@ -26,7 +26,9 @@ class StrategyRegistry(Generic[StrategyT, StatsT, MetaT]):
         # now only for tests
         return self._strategies
 
-    def _register(self, strategy: StrategyT) -> "StrategyRegistry[StrategyT, StatsT, MetaT]":
+    def _register(
+        self, strategy: StrategyT
+    ) -> "StrategyRegistry[StrategyT, StatsT, MetaT]":
         if strategy.column_type != self.column_type:
             raise TypeError(
                 f"Strategy {strategy.__class__.__name__} should be for {strategy.column_type}."
@@ -40,7 +42,8 @@ class StrategyRegistry(Generic[StrategyT, StatsT, MetaT]):
 
     def bulk_register(self, strategies: List[StrategyT]):
         for s in strategies:
-            self._register(s)
+            if s is not None:
+                self._register(s)
         return self
 
     def resolve(

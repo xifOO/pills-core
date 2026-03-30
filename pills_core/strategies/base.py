@@ -78,8 +78,9 @@ class SingleStrategy(TransformStrategy[StatsT, MetaT], Generic[StatsT, MetaT]):
     name: ClassVar[str]
     family_role: ClassVar[FamilyRole]
 
-    embedding: ClassVar[StrategyEmbedding]
-    radius: ClassVar[float] = 1.0
+    def __init__(self, *, embedding: StrategyEmbedding, radius: float) -> None:
+        self.embedding = embedding
+        self.radius = radius
 
     def distance(
         self, column_embedding: StrategyEmbedding, weights: Dict[str, float]

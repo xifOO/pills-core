@@ -20,6 +20,16 @@ class NumericalScalingStrategy(NumericalStrategy):
     assumes_normality: ClassVar[bool] = False
     requires_outliers_removed: ClassVar[bool] = False
 
+    def __init__(
+        self,
+        *,
+        embedding: StrategyEmbedding,
+        radius: float,
+        normality_skewness_limit: float = 1.0,
+    ) -> None:
+        super().__init__(embedding=embedding, radius=radius)
+        self.normality_skewness_limit = normality_skewness_limit
+
     @property
     def phase(self) -> TransformPhase:
         return TransformPhase.SCALING
@@ -35,7 +45,10 @@ class NumericalScalingStrategy(NumericalStrategy):
             return False
         if self.requires_non_negative and stats.min < 0:
             return False
-        if self.assumes_normality and abs(stats.skewness) >= 1.0:
+        if (
+            self.assumes_normality
+            and abs(stats.skewness) >= self.normality_skewness_limit
+        ):
             return False
         return True
 
@@ -56,21 +69,11 @@ class StandardScalerStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "standard_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.LINEAR_SCALING
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.1,
-        outliers_sensitivity=0.9,
-        missing_ratio_fit=0.5,
-        distribution_preservation=1.0,
-        target_safety=0.0,
-        cardinality_fit=0.4,
-    )
-    radius = 1.2
-
-    sensitive_to_outliers = True
-    assumes_normality = True
-    preserves_distribution = True
-    is_invertible = True
-    requires_outliers_removed = True
+    sensitive_to_outliers: ClassVar[bool] = True
+    assumes_normality: ClassVar[bool] = True
+    preserves_distribution: ClassVar[bool] = True
+    is_invertible: ClassVar[bool] = True
+    requires_outliers_removed: ClassVar[bool] = True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         return (data - stats.mean) / stats.std
@@ -80,20 +83,12 @@ class MinMaxScalerStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "min_max_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.LINEAR_SCALING
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.3,
-        outliers_sensitivity=1.0,
-        missing_ratio_fit=0.5,
-        distribution_preservation=1.0,
-        target_safety=0.0,
-        cardinality_fit=0.4,
+    sensitive_to_outliers: ClassVar[bool] = (
+        True  # → should_apply will block if outlier_ratio >= 0.05
     )
-    radius = 1.0
-
-    sensitive_to_outliers = True  # → should_apply will block if outlier_ratio >= 0.05
-    assumes_normality = False
-    preserves_distribution = True
-    is_invertible = True
+    assumes_normality: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = True
+    is_invertible: ClassVar[bool] = True
 
     def should_apply(
         self, stats: NumericalColumnStats, meta: NumericalColumnMeta
@@ -114,27 +109,27 @@ class LogTransformStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "log_transform"
     family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=1.0,
-        outliers_sensitivity=0.3,
-        missing_ratio_fit=0.5,
-        distribution_preservation=0.1,
-        target_safety=0.0,
-        cardinality_fit=0.6,
-    )
-    radius = 1.1
+    requires_non_negative: ClassVar[bool] = True  # → should_apply will block if min < 0
+    preserves_distribution: ClassVar[bool] = False
+    sensitive_to_outliers: ClassVar[bool] = False
+    is_invertible: ClassVar[bool] = True
 
-    requires_non_negative = True  # → should_apply will block if min < 0
-    preserves_distribution = False
-    sensitive_to_outliers = False
-    is_invertible = True
+    def __init__(
+        self,
+        *,
+        embedding: StrategyEmbedding,
+        radius: float,
+        min_skewness: float,
+    ) -> None:
+        super().__init__(embedding=embedding, radius=radius)
+        self.min_skewness = min_skewness
 
     def should_apply(
         self, stats: NumericalColumnStats, meta: NumericalColumnMeta
     ) -> bool:
         if meta.semantic_role == SemanticRole.COUNT and stats.min >= 0:
             return True
-        return super().should_apply(stats, meta) and stats.skewness > 1.5
+        return super().should_apply(stats, meta) and stats.skewness > self.min_skewness
 
     def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if (
@@ -161,20 +156,10 @@ class RobustScalerStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "robust_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.ROBUST
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.5,
-        outliers_sensitivity=0.1,
-        missing_ratio_fit=0.5,
-        distribution_preservation=0.9,
-        target_safety=0.0,
-        cardinality_fit=0.4,
-    )
-    radius = 1.5
-
-    sensitive_to_outliers = False
-    assumes_normality = False
-    preserves_distribution = True
-    is_invertible = True
+    sensitive_to_outliers: ClassVar[bool] = False
+    assumes_normality: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = True
+    is_invertible: ClassVar[bool] = True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
         iqr = stats.q3 - stats.q1
@@ -187,28 +172,30 @@ class BoxCoxStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "box_cox"
     family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=1.0,
-        outliers_sensitivity=0.7,
-        missing_ratio_fit=0.5,
-        distribution_preservation=0.1,
-        target_safety=0.0,
-        cardinality_fit=0.3,
+    requires_non_negative: ClassVar[bool] = True  # Box-Cox requires positive values
+    preserves_distribution: ClassVar[bool] = (
+        False  # changes the shape of the distribution
     )
-    radius = 1.0
+    sensitive_to_outliers: ClassVar[bool] = True
+    is_invertible: ClassVar[bool] = False  # currently not invertible
 
-    requires_non_negative = True  # Box-Cox requires positive values
-    preserves_distribution = False  # changes the shape of the distribution
-    sensitive_to_outliers = True
-    is_invertible = False  # currently not invertible
-
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        embedding: StrategyEmbedding,
+        radius: float,
+        min_skewness: float,
+        shift_epsilon: float,
+    ) -> None:
+        super().__init__(embedding=embedding, radius=radius)
+        self.min_skewness = min_skewness
+        self.shift_epsilon = shift_epsilon
         self.shift_: float = 0.0
 
     def should_apply(
         self, stats: NumericalColumnStats, meta: NumericalColumnMeta
     ) -> bool:
-        if stats.skewness <= 1.5:
+        if stats.skewness <= self.min_skewness:
             return False
 
         return super().should_apply(stats, meta)
@@ -231,7 +218,7 @@ class BoxCoxStrategy(NumericalScalingStrategy):
         min_val: float = float(values.min())
 
         if min_val <= 0:
-            self.shift_ = abs(min_val) + 1e-6
+            self.shift_ = abs(min_val) + self.shift_epsilon
             values = values + self.shift_
 
         result = sstats.boxcox(values)
@@ -245,20 +232,10 @@ class SqrtTransformStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "sqrt_transform"
     family_role: ClassVar[FamilyRole] = FamilyRole.SKEW_TRANSFORM
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.7,
-        outliers_sensitivity=0.5,
-        missing_ratio_fit=0.5,
-        distribution_preservation=0.3,
-        target_safety=0.0,
-        cardinality_fit=0.5,
-    )
-    radius = 1.2
-
-    requires_non_negative = True
-    is_invertible = True
-    preserves_distribution = False
-    sensitive_to_outliers = True
+    requires_non_negative: ClassVar[bool] = True
+    is_invertible: ClassVar[bool] = True
+    preserves_distribution: ClassVar[bool] = False
+    sensitive_to_outliers: ClassVar[bool] = True
 
     def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.domain_profile.is_rate or meta.domain_profile.is_ratio:

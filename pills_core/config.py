@@ -4,6 +4,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pills_core._enums import TaskType
+from pills_core.strategies.config import StrategiesConfig
 
 
 class HardwareConfig(BaseSettings):
@@ -55,6 +56,7 @@ class PillConfig(BaseSettings):
     hardware: HardwareConfig = Field(default_factory=HardwareConfig)
     data: DataProcessingConfig = Field(default_factory=DataProcessingConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
+    strategies: StrategiesConfig = Field(default_factory=StrategiesConfig)
 
     model_config = SettingsConfigDict(
         title="Pills Main Configuration",
