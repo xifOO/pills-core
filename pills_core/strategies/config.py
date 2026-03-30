@@ -1,6 +1,10 @@
+from typing import Union
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from pills_core.strategies.base import StrategyEmbedding
+from pills_core.strategies.categorical.base import CategoricalEmbedding
+from pills_core.strategies.numeric.base import NumericalEmbedding
 
 
 class StrategyConfigModel(BaseModel):
@@ -14,30 +18,50 @@ class StrategyWeightsConfig(StrategyConfigModel):
     distribution_preservation: float = 1.0
     target_safety: float = 1.0
     cardinality_fit: float = 1.0
+    rare_categories_handling: float = 1.0
+    imbalance_sensitivity: float = 1.0
+    order_awareness: float = 1.0
+    typo_tolerance: float = 1.0
 
     def as_dict(self) -> dict[str, float]:
         return {key: float(value) for key, value in self.model_dump().items()}
 
 
 class StrategyEmbeddingConfig(StrategyConfigModel):
-    skewness_sensitivity: float = 1.0
-    outliers_sensitivity: float = 1.0
     missing_ratio_fit: float = 1.0
     distribution_preservation: float = 1.0
     target_safety: float = 1.0
     cardinality_fit: float = 1.0
 
-    def as_embedding(self) -> StrategyEmbedding:
-        return StrategyEmbedding(**self.model_dump())
+
+class NumericalEmbeddingConfig(StrategyEmbeddingConfig):
+    skewness_sensitivity: float = 1.0
+    outliers_sensitivity: float = 1.0
+
+    def as_embedding(self) -> NumericalEmbedding:
+        return NumericalEmbedding(**self.model_dump())
+
+
+class CategoricalEmbeddingConfig(StrategyEmbeddingConfig):
+    rare_categories_handling: float = 1.0
+    imbalance_sensitivity: float = 1.0
+    order_awareness: float = 1.0
+    typo_tolerance: float = 1.0
+
+    def as_embedding(self) -> CategoricalEmbedding:
+        return CategoricalEmbedding(**self.model_dump())
 
 
 class StrategyInstanceConfig(StrategyConfigModel):
     enabled: bool = True
     radius: float = Field(default=1.0, ge=0.0)
-    embedding: StrategyEmbeddingConfig = Field(default_factory=StrategyEmbeddingConfig)
 
 
-class SensitiveNumericalImputationConfig(StrategyInstanceConfig):
+class NumericalStrategyInstanceConfig(StrategyInstanceConfig):
+    embedding: NumericalEmbeddingConfig = Field(default_factory=NumericalEmbeddingConfig)
+
+
+class SensitiveNumericalImputationConfig(NumericalStrategyInstanceConfig):
     max_outlier_ratio: float = Field(
         default=0.15,
         ge=0.0,
@@ -51,14 +75,14 @@ class SensitiveNumericalImputationConfig(StrategyInstanceConfig):
     )
 
 
-class BoundaryImputationConfig(StrategyInstanceConfig):
+class BoundaryImputationConfig(NumericalStrategyInstanceConfig):
     std_multiplier: float = Field(default=3.0, gt=0.0)
 
 
-class MedianImputationConfig(StrategyInstanceConfig):
+class MedianImputationConfig(NumericalStrategyInstanceConfig):
     radius: float = 1.9
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.9,
             outliers_sensitivity=0.1,
             missing_ratio_fit=0.8,
@@ -71,8 +95,8 @@ class MedianImputationConfig(StrategyInstanceConfig):
 
 class MeanImputationConfig(SensitiveNumericalImputationConfig):
     radius: float = 1.2
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.2,
             outliers_sensitivity=0.9,
             missing_ratio_fit=0.7,
@@ -83,10 +107,10 @@ class MeanImputationConfig(SensitiveNumericalImputationConfig):
     )
 
 
-class ModeImputationConfig(StrategyInstanceConfig):
+class ModeImputationConfig(NumericalStrategyInstanceConfig):
     radius: float = 1.2
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.5,
             outliers_sensitivity=0.1,
             missing_ratio_fit=0.6,
@@ -97,10 +121,10 @@ class ModeImputationConfig(StrategyInstanceConfig):
     )
 
 
-class ZeroImputationConfig(StrategyInstanceConfig):
+class ZeroImputationConfig(NumericalStrategyInstanceConfig):
     radius: float = 1.0
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.6,
             outliers_sensitivity=0.4,
             missing_ratio_fit=0.9,
@@ -113,8 +137,8 @@ class ZeroImputationConfig(StrategyInstanceConfig):
 
 class UpperBoundaryImputationConfig(BoundaryImputationConfig):
     radius: float = 1.1
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.8,
             outliers_sensitivity=0.6,
             missing_ratio_fit=0.5,
@@ -127,8 +151,8 @@ class UpperBoundaryImputationConfig(BoundaryImputationConfig):
 
 class LowerBoundaryImputationConfig(BoundaryImputationConfig):
     radius: float = 1.1
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.8,
             outliers_sensitivity=0.6,
             missing_ratio_fit=0.5,
@@ -139,13 +163,13 @@ class LowerBoundaryImputationConfig(BoundaryImputationConfig):
     )
 
 
-class IQRStrategyConfig(StrategyInstanceConfig):
+class IQRStrategyConfig(NumericalStrategyInstanceConfig):
     max_abs_skewness: float = Field(default=1.5, ge=0.0)
     min_outlier_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
     clip_multiplier: float = Field(default=1.5, gt=0.0)
     radius: float = 1.4
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.4,
             outliers_sensitivity=0.1,
             missing_ratio_fit=0.5,
@@ -156,13 +180,13 @@ class IQRStrategyConfig(StrategyInstanceConfig):
     )
 
 
-class ZScoreStrategyConfig(StrategyInstanceConfig):
+class ZScoreStrategyConfig(NumericalStrategyInstanceConfig):
     threshold: float = Field(default=3.0, gt=0.0)
     max_abs_skewness: float = Field(default=1.0, ge=0.0)
     min_sample_size: int = Field(default=30, ge=1)
     radius: float = 1.1
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.1,
             outliers_sensitivity=0.8,
             missing_ratio_fit=0.5,
@@ -173,14 +197,14 @@ class ZScoreStrategyConfig(StrategyInstanceConfig):
     )
 
 
-class WinsorizeStrategyConfig(StrategyInstanceConfig):
+class WinsorizeStrategyConfig(NumericalStrategyInstanceConfig):
     min_outlier_ratio: float = Field(default=0.01, ge=0.0, le=1.0)
     min_sample_size: int = Field(default=20, ge=1)
     lower_quantile: float = Field(default=0.05, ge=0.0, lt=1.0)
     upper_quantile: float = Field(default=0.95, gt=0.0, le=1.0)
     radius: float = 1.6
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.8,
             outliers_sensitivity=0.2,
             missing_ratio_fit=0.5,
@@ -191,7 +215,7 @@ class WinsorizeStrategyConfig(StrategyInstanceConfig):
     )
 
 
-class NormalityAwareScalingConfig(StrategyInstanceConfig):
+class NormalityAwareScalingConfig(NumericalStrategyInstanceConfig):
     max_abs_skewness: float = Field(
         default=1.0,
         ge=0.0,
@@ -201,8 +225,8 @@ class NormalityAwareScalingConfig(StrategyInstanceConfig):
 
 class StandardScalerConfig(NormalityAwareScalingConfig):
     radius: float = 1.2
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.1,
             outliers_sensitivity=0.9,
             missing_ratio_fit=0.5,
@@ -213,10 +237,10 @@ class StandardScalerConfig(NormalityAwareScalingConfig):
     )
 
 
-class MinMaxScalerConfig(StrategyInstanceConfig):
+class MinMaxScalerConfig(NumericalStrategyInstanceConfig):
     radius: float = 1.0
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.3,
             outliers_sensitivity=1.0,
             missing_ratio_fit=0.5,
@@ -227,11 +251,11 @@ class MinMaxScalerConfig(StrategyInstanceConfig):
     )
 
 
-class LogTransformConfig(StrategyInstanceConfig):
+class LogTransformConfig(NumericalStrategyInstanceConfig):
     min_skewness: float = Field(default=1.5)
     radius: float = 1.1
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=1.0,
             outliers_sensitivity=0.3,
             missing_ratio_fit=0.5,
@@ -242,10 +266,10 @@ class LogTransformConfig(StrategyInstanceConfig):
     )
 
 
-class RobustScalerConfig(StrategyInstanceConfig):
+class RobustScalerConfig(NumericalStrategyInstanceConfig):
     radius: float = 1.5
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.5,
             outliers_sensitivity=0.1,
             missing_ratio_fit=0.5,
@@ -256,12 +280,12 @@ class RobustScalerConfig(StrategyInstanceConfig):
     )
 
 
-class BoxCoxConfig(StrategyInstanceConfig):
+class BoxCoxConfig(NumericalStrategyInstanceConfig):
     min_skewness: float = Field(default=1.5)
     shift_epsilon: float = Field(default=1e-6, gt=0.0)
     radius: float = 1.0
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=1.0,
             outliers_sensitivity=0.7,
             missing_ratio_fit=0.5,
@@ -272,10 +296,10 @@ class BoxCoxConfig(StrategyInstanceConfig):
     )
 
 
-class SqrtTransformConfig(StrategyInstanceConfig):
+class SqrtTransformConfig(NumericalStrategyInstanceConfig):
     radius: float = 1.2
-    embedding: StrategyEmbeddingConfig = Field(
-        default_factory=lambda: StrategyEmbeddingConfig(
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=lambda: NumericalEmbeddingConfig(
             skewness_sensitivity=0.7,
             outliers_sensitivity=0.5,
             missing_ratio_fit=0.5,
