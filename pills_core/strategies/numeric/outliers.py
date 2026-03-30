@@ -3,7 +3,11 @@ from typing import ClassVar
 import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TransformPhase
-from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy, NumericalEmbedding
+from pills_core.strategies.numeric.base import (
+    NumericalColumnMeta,
+    NumericalEmbedding,
+    NumericalStrategy,
+)
 from pills_core.types.stats import NumericalColumnStats
 
 

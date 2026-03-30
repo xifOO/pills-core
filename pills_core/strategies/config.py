@@ -1,8 +1,6 @@
-from typing import Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pills_core.strategies.base import StrategyEmbedding
 from pills_core.strategies.categorical.base import CategoricalEmbedding
 from pills_core.strategies.numeric.base import NumericalEmbedding
 
@@ -58,7 +56,9 @@ class StrategyInstanceConfig(StrategyConfigModel):
 
 
 class NumericalStrategyInstanceConfig(StrategyInstanceConfig):
-    embedding: NumericalEmbeddingConfig = Field(default_factory=NumericalEmbeddingConfig)
+    embedding: NumericalEmbeddingConfig = Field(
+        default_factory=NumericalEmbeddingConfig
+    )
 
 
 class SensitiveNumericalImputationConfig(NumericalStrategyInstanceConfig):

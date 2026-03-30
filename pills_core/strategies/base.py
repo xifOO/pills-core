@@ -36,6 +36,7 @@ class StrategyEmbedding:
 
     All values are in [0.0, 1.0] unless noted otherwise.
     """
+
     missing_ratio_fit: float  # how well it handles high missing ratios
     distribution_preservation: float  # how much it preverses the original shape
     target_safety: float  # safe to apply on target variable
@@ -72,7 +73,9 @@ class TransformStrategy(ABC, Generic[StatsT, MetaT, EmbeddingT]):
         return ""
 
 
-class SingleStrategy(TransformStrategy[StatsT, MetaT, EmbeddingT], Generic[StatsT, MetaT, EmbeddingT]):
+class SingleStrategy(
+    TransformStrategy[StatsT, MetaT, EmbeddingT], Generic[StatsT, MetaT, EmbeddingT]
+):
     name: ClassVar[str]
     family_role: ClassVar[FamilyRole]
 

@@ -14,11 +14,13 @@ class NumericalColumnMeta(ColumnMeta):
 
 @dataclass
 class NumericalEmbedding(StrategyEmbedding):
-    skewness_sensitivity: float # how well it handles skewed distributions
+    skewness_sensitivity: float  # how well it handles skewed distributions
     outliers_sensitivity: float  # how much outliers degrade it (higher = worse)
 
 
-class NumericalStrategy(SingleStrategy[NumericalColumnStats, NumericalColumnMeta, NumericalEmbedding], ABC):
+class NumericalStrategy(
+    SingleStrategy[NumericalColumnStats, NumericalColumnMeta, NumericalEmbedding], ABC
+):
     @property
     def column_type(self) -> ColumnRole:
         return ColumnRole.NUMERICAL

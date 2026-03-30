@@ -1,15 +1,15 @@
 import pytest
 
 from pills_core._enums import TransformPhase
-from pills_core.strategies.numeric._registry import (
-    build_imputation_registry,
-    build_outliers_registry,
-    build_scaling_registry,
-)
 from pills_core.strategies.config import (
     NumericalImputationRegistryConfig,
     NumericalOutlierRegistryConfig,
     NumericalScalingRegistryConfig,
+)
+from pills_core.strategies.numeric._registry import (
+    build_imputation_registry,
+    build_outliers_registry,
+    build_scaling_registry,
 )
 from pills_core.strategies.resolver import resolve_phase_order
 

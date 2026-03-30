@@ -4,7 +4,11 @@ import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
 from pills_core.strategies.base import ColumnMeta
-from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalEmbedding, NumericalStrategy
+from pills_core.strategies.numeric.base import (
+    NumericalColumnMeta,
+    NumericalEmbedding,
+    NumericalStrategy,
+)
 from pills_core.types.stats import NumericalColumnStats
 
 

@@ -14,14 +14,21 @@ class CategoricalColumnMeta(ColumnMeta):
 
 @dataclass
 class CategoricalEmbedding(StrategyEmbedding):
-    rare_categories_handling: float # how well it handles rare/infrequent categories (1.0 = excellent)
-    imbalance_sensitivity: float # sensitivity to class imbalance (1.0 = very sensitive, worse)
-    order_awareness: float # whether it respects ordinal relationships (1.0 = ordinal-aware)
-    typo_tolerance: float # requires typo cleaning beforehand (1.0 = requires cleaning)
+    rare_categories_handling: (
+        float  # how well it handles rare/infrequent categories (1.0 = excellent)
+    )
+    imbalance_sensitivity: (
+        float  # sensitivity to class imbalance (1.0 = very sensitive, worse)
+    )
+    order_awareness: (
+        float  # whether it respects ordinal relationships (1.0 = ordinal-aware)
+    )
+    typo_tolerance: float  # requires typo cleaning beforehand (1.0 = requires cleaning)
 
 
 class CategoricalStrategy(
-    SingleStrategy[CategoricalColumnStats, CategoricalColumnMeta, CategoricalEmbedding], ABC
+    SingleStrategy[CategoricalColumnStats, CategoricalColumnMeta, CategoricalEmbedding],
+    ABC,
 ):
     @property
     def column_type(self) -> ColumnRole:

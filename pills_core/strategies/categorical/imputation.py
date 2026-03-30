@@ -69,40 +69,40 @@ class CategoricalImputationStrategy(CategoricalStrategy):
 
 
 class MostFrequentStrategy(CategoricalImputationStrategy):
-    def __init__(
-        self, 
-        *, 
-        embedding: CategoricalEmbedding, 
-        radius: float
-    ) -> None:
+    def __init__(self, *, embedding: CategoricalEmbedding, radius: float) -> None:
         super().__init__(embedding=embedding, radius=radius)
 
     def is_task_valid(self, meta: CategoricalColumnMeta) -> bool:
-        if meta.task_type == TaskType.REGRESSION or meta.task_type == TaskType.TIME_SERIES:
+        if (
+            meta.task_type == TaskType.REGRESSION
+            or meta.task_type == TaskType.TIME_SERIES
+        ):
             return False
-        
+
         return True
 
     def is_domain_valid(self, meta: CategoricalColumnMeta) -> bool:
         if meta.profile.has_order:
             return False
-        
+
         if meta.profile.cardinality == Cardinality.HIGH and meta.profile.n_unique > 100:
             return False
-        
+
         return True
 
-    def should_apply(self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta) -> bool:
+    def should_apply(
+        self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta
+    ) -> bool:
         if stats.missing_ratio > 0.5:
             return False
-        
+
         if stats.most_frequent_ratio < 0.2:
             return False
-        
+
         if stats.rare_ratio > 0.3:
             return False
-        
+
         return super().should_apply(stats, meta)
-    
+
     def apply(self, data: pd.Series, stats: CategoricalColumnStats) -> pd.Series:
         return data.fillna(stats.mode)
