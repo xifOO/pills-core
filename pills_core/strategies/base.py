@@ -16,6 +16,7 @@ from pills_core.types.profiles import DomainProfile
 from pills_core.types.stats import StatsT
 
 MetaT = TypeVar("MetaT", bound="ColumnMeta")
+EmbeddingT = TypeVar("EmbeddingT", bound="StrategyEmbedding")
 
 
 @dataclass
@@ -35,9 +36,6 @@ class StrategyEmbedding:
 
     All values are in [0.0, 1.0] unless noted otherwise.
     """
-
-    skewness_sensitivity: float  # how well it handles skewed distributions
-    outliers_sensitivity: float  # how much outliers degrade it (higher = worse)
     missing_ratio_fit: float  # how well it handles high missing ratios
     distribution_preservation: float  # how much it preverses the original shape
     target_safety: float  # safe to apply on target variable
@@ -49,7 +47,7 @@ class StrategyEmbedding:
         return np.array(weighted_values, dtype=np.float32)
 
 
-class TransformStrategy(ABC, Generic[StatsT, MetaT]):
+class TransformStrategy(ABC, Generic[StatsT, MetaT, EmbeddingT]):
     @property
     @abstractmethod
     def column_type(self) -> ColumnRole: ...
@@ -74,16 +72,16 @@ class TransformStrategy(ABC, Generic[StatsT, MetaT]):
         return ""
 
 
-class SingleStrategy(TransformStrategy[StatsT, MetaT], Generic[StatsT, MetaT]):
+class SingleStrategy(TransformStrategy[StatsT, MetaT, EmbeddingT], Generic[StatsT, MetaT, EmbeddingT]):
     name: ClassVar[str]
     family_role: ClassVar[FamilyRole]
 
-    def __init__(self, *, embedding: StrategyEmbedding, radius: float) -> None:
+    def __init__(self, *, embedding: EmbeddingT, radius: float) -> None:
         self.embedding = embedding
         self.radius = radius
 
     def distance(
-        self, column_embedding: StrategyEmbedding, weights: Dict[str, float]
+        self, column_embedding: EmbeddingT, weights: Dict[str, float]
     ) -> float:
         return float(
             np.linalg.norm(
@@ -94,7 +92,7 @@ class SingleStrategy(TransformStrategy[StatsT, MetaT], Generic[StatsT, MetaT]):
 
     def score(
         self,
-        column_embedding: StrategyEmbedding,
+        column_embedding: EmbeddingT,
         stats: StatsT,
         meta: MetaT,
         weights: Dict[str, float],
