@@ -3,12 +3,13 @@ from dataclasses import dataclass
 
 from pills_core._enums import ColumnRole
 from pills_core.strategies.base import ColumnMeta, SingleStrategy, StrategyEmbedding
-from pills_core.types.profiles import CategoricalProfile
+from pills_core.types.profiles import CategoricalDomainProfile, CategoricalProfile
 from pills_core.types.stats import CategoricalColumnStats
 
 
 @dataclass
 class CategoricalColumnMeta(ColumnMeta):
+    domain_profile: CategoricalDomainProfile
     profile: CategoricalProfile
 
 

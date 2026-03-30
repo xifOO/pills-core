@@ -10,7 +10,7 @@ ContextT = TypeVar("ContextT")
 
 
 _DOMAIN_TAG_FIELDS: frozenset[str] = frozenset(
-    {"is_ratio", "is_monetary", "is_rate", "is_score"}
+    {"is_ratio", "is_monetary", "is_rate", "is_score", "is_count"}
 )
 
 
@@ -26,16 +26,17 @@ class DomainTags:
     is_monetary: bool = False
     is_rate: bool = False
     is_score: bool = False
+    is_count: bool = False
 
     @classmethod
     def from_tag_name(cls, tag_name: str) -> "DomainTags":
-        """
-        Build a DomainTags with exactly one flag set to True by field name.
-        Raises UnknownDomainTagError if the name is not a known field.
-        """
         if tag_name not in _DOMAIN_TAG_FIELDS:
             raise UnknownDomainTagError(tag_name)
         return cls(**{tag_name: True})
+
+    @classmethod
+    def from_group_name(cls, group_name: str) -> "DomainTags":
+        return cls.from_tag_name(f"is_{group_name}")
 
     def merge(self, other: "DomainTags") -> "DomainTags":
         return DomainTags(
@@ -43,10 +44,19 @@ class DomainTags:
             is_monetary=self.is_monetary or other.is_monetary,
             is_rate=self.is_rate or other.is_rate,
             is_score=self.is_score or other.is_score,
+            is_count=self.is_count or other.is_count,
         )
 
     def any_set(self) -> bool:
-        return any((self.is_ratio, self.is_monetary, self.is_rate, self.is_score))
+        return any(
+            (
+                self.is_ratio,
+                self.is_monetary,
+                self.is_rate,
+                self.is_score,
+                self.is_count,
+            )
+        )
 
 
 @dataclass(frozen=True, slots=True)

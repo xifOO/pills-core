@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from pills_core.strategies.categorical.base import CategoricalEmbedding

@@ -2,19 +2,19 @@ from enum import Enum, StrEnum, auto
 
 
 class TaskType(StrEnum):
-    BINARY = "binary"
-    MULTICLASS = "multiclass"
-    REGRESSION = "regression"
-    TIME_SERIES = "time_series"
-    AUTO = "auto"
+    BINARY = auto()
+    MULTICLASS = auto()
+    REGRESSION = auto()
+    TIME_SERIES = auto()
+    AUTO = auto()
 
 
 class ColumnRole(StrEnum):
-    TARGET = "target"
-    NUMERICAL = "numerical"
-    CATEGORICAL = "categorical"
-    DATETIME = "datetime"
-    DROP = "drop"
+    TARGET = auto()
+    NUMERICAL = auto()
+    CATEGORICAL = auto()
+    DATETIME = auto()
+    DROP = auto()
 
 
 class SemanticRole(Enum):

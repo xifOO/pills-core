@@ -1,5 +1,5 @@
 _DOMAIN_TAG_FIELDS: frozenset[str] = frozenset(
-    {"is_ratio", "is_monetary", "is_rate", "is_score"}
+    {"is_ratio", "is_monetary", "is_rate", "is_score", "is_count"}
 )
 
 

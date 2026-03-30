@@ -5,7 +5,6 @@ import pandas as pd
 from pills_core._enums import TaskType, TransformPhase
 from pills_core.strategies.categorical.base import (
     CategoricalColumnMeta,
-    CategoricalEmbedding,
     CategoricalStrategy,
 )
 from pills_core.types.profiles import Cardinality
@@ -69,9 +68,6 @@ class CategoricalImputationStrategy(CategoricalStrategy):
 
 
 class MostFrequentStrategy(CategoricalImputationStrategy):
-    def __init__(self, *, embedding: CategoricalEmbedding, radius: float) -> None:
-        super().__init__(embedding=embedding, radius=radius)
-
     def is_task_valid(self, meta: CategoricalColumnMeta) -> bool:
         if (
             meta.task_type == TaskType.REGRESSION
@@ -93,7 +89,7 @@ class MostFrequentStrategy(CategoricalImputationStrategy):
     def should_apply(
         self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta
     ) -> bool:
-        if stats.missing_ratio > 0.5:
+        if stats.missing_ratio > 0.1:
             return False
 
         if stats.most_frequent_ratio < 0.2:
@@ -106,3 +102,92 @@ class MostFrequentStrategy(CategoricalImputationStrategy):
 
     def apply(self, data: pd.Series, stats: CategoricalColumnStats) -> pd.Series:
         return data.fillna(stats.mode)
+
+
+class MissingStrategy(CategoricalImputationStrategy):
+    creates_new_category: ClassVar[bool] = True
+    sensitive_to_imbalance: ClassVar[bool] = False
+
+    def is_domain_valid(self, meta: CategoricalColumnMeta) -> bool:
+        if meta.profile.cardinality == Cardinality.HIGH:
+            return False
+
+        return True
+
+    def should_apply(
+        self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta
+    ) -> bool:
+        if stats.n_unique > 3 and stats.missing_ratio < 0.1 and stats.rare_ratio < 0.2:
+            return False
+
+        if stats.rare_ratio < 0.2 and stats.missing_ratio < 0.05:
+            return False
+
+        if stats.missing_ratio < 0.05:
+            if not (
+                meta.profile.is_domain_specific
+                or meta.profile.has_order
+                or stats.n_unique <= 3
+            ):
+                return False
+
+        return super().should_apply(stats, meta)
+
+    def apply(self, data: pd.Series, stats: CategoricalColumnStats) -> pd.Series:
+        return data.fillna("__MISSING__")
+
+
+class ForwardFillStrategy(CategoricalImputationStrategy):
+    sensitive_to_imbalance: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = False
+    handles_rare_categories: ClassVar[bool] = True
+    safe_for_target: ClassVar[bool] = False
+    supports_ordinal: ClassVar[bool] = True
+
+    def is_task_valid(self, meta: CategoricalColumnMeta) -> bool:
+        return meta.task_type == TaskType.TIME_SERIES
+
+    def is_domain_valid(self, meta: CategoricalColumnMeta) -> bool:
+        return meta.profile.has_order
+
+    def should_apply(
+        self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta
+    ) -> bool:
+        if stats.missing_ratio > 0.5:
+            return False
+
+        if meta.profile.has_leading_nulls:
+            return False
+
+        return super().should_apply(stats, meta)
+
+    def apply(self, data: pd.Series, stats: CategoricalColumnStats) -> pd.Series:
+        return data.ffill()
+
+
+class BackwardFillStrategy(CategoricalImputationStrategy):
+    sensitive_to_imbalance: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = False
+    handles_rare_categories: ClassVar[bool] = True
+    safe_for_target: ClassVar[bool] = False
+    supports_ordinal: ClassVar[bool] = True
+
+    def is_task_valid(self, meta: CategoricalColumnMeta) -> bool:
+        return meta.task_type == TaskType.TIME_SERIES
+
+    def is_domain_valid(self, meta: CategoricalColumnMeta) -> bool:
+        return meta.profile.has_order
+
+    def should_apply(
+        self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta
+    ) -> bool:
+        if stats.missing_ratio > 0.5:
+            return False
+
+        if stats.missing_ratio < 0.1 and not meta.profile.has_leading_nulls:
+            return False
+
+        return super().should_apply(stats, meta)
+
+    def apply(self, data: pd.Series, stats: CategoricalColumnStats) -> pd.Series:
+        return data.bfill()

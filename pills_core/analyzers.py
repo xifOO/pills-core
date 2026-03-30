@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Generic, Mapping
+from typing import Generic
 
+import numpy as np
 import pandas as pd
 
 from pills_core._enums import ColumnRole, SemanticRole, TaskType
@@ -17,40 +18,25 @@ from pills_core.rules import (
     MatchRule,
 )
 from pills_core.strategies.base import ColumnMeta, MetaT, StrategyEmbedding
-from pills_core.strategies.categorical.base import CategoricalColumnMeta
-from pills_core.strategies.numeric.base import NumericalColumnMeta
+from pills_core.strategies.categorical.base import (
+    CategoricalColumnMeta,
+    CategoricalEmbedding,
+)
+from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalEmbedding
 from pills_core.types.profiles import (
     Cardinality,
+    CategoricalDomainProfile,
     CategoricalProfile,
-    DomainProfile,
+    NumericalDomainProfile,
     StatisticalProfile,
 )
-from pills_core.types.stats import CategoricalColumnStats, NumericalColumnStats, StatsT
-
-
-@dataclass(frozen=True, slots=True)
-class NumericalThresholds:
-    id_unique_ratio: float = 0.95
-    id_monotonic_ratio: float = 0.95
-    binary_max_unique: int = 2
-    low_unique_ratio: float = 0.15
-    low_unique_abs: int = 20
-    ordinal_max_skewness: float = 1.0
-    count_skewness: float = 0.5
-    skewed_threshold: float = 1.0
-    heavy_tail_kurtosis: float = 3.0
-    sparse_missing_ratio: float = 0.3
-    low_variance_cv: float = 0.01
-
-
-@dataclass(frozen=True, slots=True)
-class CategoricalThresholds:
-    binary_max_unique: int = 2
-    low_cardinality_max: int = 10
-    medium_cardinality_max: int = 100
-    rare_ratio_threshold: float = 0.05
-    dominant_ratio_threshold: float = 0.95
-    sparse_missing_ratio: float = 0.3
+from pills_core.types.stats import (
+    CategoricalColumnStats,
+    CategoricalThresholds,
+    NumericalColumnStats,
+    NumericalThresholds,
+    StatsT,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,9 +53,9 @@ class DomainConfig:
 
 @dataclass(frozen=True, slots=True)
 class AnalyzerConfig:
-    numerical: NumericalThresholds = field(default_factory=NumericalThresholds)
-    categorical: CategoricalThresholds = field(default_factory=CategoricalThresholds)
-    domain: DomainConfig = field(default_factory=DomainConfig)
+    numerical: NumericalThresholds
+    categorical: CategoricalThresholds
+    domain: DomainConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,149 +66,6 @@ class NumericalRuleContext:
 @dataclass(frozen=True, slots=True)
 class CategoricalRuleContext:
     stats: CategoricalColumnStats
-
-
-def build_analyzer_config(payload: Mapping[str, Any]) -> AnalyzerConfig:
-    numerical_payload = payload.get("numerical", {})
-    categorical_payload = payload.get("categorical", {})
-    domain_payload = payload.get("domain", {})
-
-    if "thresholds" in numerical_payload:
-        numerical_payload = numerical_payload["thresholds"]
-
-    if "thresholds" in categorical_payload:
-        categorical_payload = categorical_payload["thresholds"]
-
-    return AnalyzerConfig(
-        numerical=NumericalThresholds(**numerical_payload),
-        categorical=CategoricalThresholds(**categorical_payload),
-        domain=build_domain_config(domain_payload),
-    )
-
-
-def _build_domain_config_from_rules(
-    rules_payload: list[Mapping[str, Any]],
-) -> DomainConfig:
-    return DomainConfig(
-        rules=tuple(build_domain_rule_config(rule) for rule in rules_payload)
-    )
-
-
-def _build_domain_config_from_keywords(
-    keywords_payload: Mapping[str, Any],
-) -> DomainConfig:
-    """
-    Legacy shorthand format::
-
-        {"ratio": ["ratio", "share"], "monetary": ["amount", "balance"]}
-
-    Each key becomes a rule whose single tag is ``is_<key>``.
-    Raises UnknownDomainTagError if the key does not map to a known tag.
-    """
-    rules: list[DomainRuleConfig] = []
-    for name, keywords in keywords_payload.items():
-        tag_name = f"is_{name}"
-        tags = DomainTags.from_tag_name(tag_name)  # raises if unknown
-        rules.append(
-            DomainRuleConfig(
-                name=str(name),
-                keywords=tuple(str(k) for k in keywords),
-                tags=tags,
-            )
-        )
-    return DomainConfig(rules=tuple(rules))
-
-
-def build_domain_config(payload: Mapping[str, Any]) -> DomainConfig:
-    """
-    Accepts two payload shapes:
-
-    1. ``{"rules": [...]}``  — explicit rule list (preferred).
-    2. ``{"ratio": [...], "monetary": [...]}``  — legacy keyword shorthand.
-
-    An empty mapping returns an empty DomainConfig.
-    """
-    if not payload:
-        return DomainConfig()
-
-    rules_payload = payload.get("rules")
-    if rules_payload is not None:
-        return _build_domain_config_from_rules(rules_payload)
-
-    keywords_payload = payload.get("keywords", payload)
-    if isinstance(keywords_payload, Mapping):
-        return _build_domain_config_from_keywords(keywords_payload)
-
-    return DomainConfig()
-
-
-def build_domain_rule_config(payload: Mapping[str, Any]) -> DomainRuleConfig:
-    tags_payload = payload.get("tags", {})
-    return DomainRuleConfig(
-        name=str(payload["name"]),
-        keywords=tuple(str(k) for k in payload.get("keywords", ())),
-        tags=DomainTags(
-            is_ratio=bool(tags_payload.get("is_ratio", False)),
-            is_monetary=bool(tags_payload.get("is_monetary", False)),
-            is_rate=bool(tags_payload.get("is_rate", False)),
-            is_score=bool(tags_payload.get("is_score", False)),
-        ),
-    )
-
-
-def default_domain_config() -> DomainConfig:
-    return DomainConfig(
-        rules=(
-            DomainRuleConfig(
-                name="ratio",
-                keywords=("ratio", "share", "util", "pct", "percent"),
-                tags=DomainTags(is_ratio=True),
-            ),
-            DomainRuleConfig(
-                name="monetary",
-                keywords=(
-                    "amnt",
-                    "amount",
-                    "bal",
-                    "balance",
-                    "limit",
-                    "installment",
-                    "recoveries",
-                    "fee",
-                    "payment",
-                    "pymnt",
-                    "prncp",
-                    "inv",
-                ),
-                tags=DomainTags(is_monetary=True),
-            ),
-            DomainRuleConfig(
-                name="rate",
-                keywords=(
-                    "int_rate",
-                    "revol_util",
-                    "il_util",
-                    "bc_util",
-                    "all_util",
-                    "sec_app_revol_util",
-                    "pct",
-                    "percent",
-                    "dti",
-                    "rate",
-                ),
-                tags=DomainTags(is_rate=True),
-            ),
-            DomainRuleConfig(
-                name="score",
-                keywords=("fico", "grade", "score"),
-                tags=DomainTags(is_score=True),
-            ),
-        )
-    )
-
-
-def default_analyzer_config() -> AnalyzerConfig:
-    return AnalyzerConfig(domain=default_domain_config())
 
 
 def build_domain_policy(config: DomainConfig) -> DomainPolicy:
@@ -451,11 +294,14 @@ def build_categorical_task_policy(
 
 
 class DomainProfiler:
+    def __init__(self, categorical_thresholds: CategoricalThresholds) -> None:
+        self._categorical_thresholds = categorical_thresholds
+
     def build_for_numerical(
         self,
         tags: DomainTags,
         stats: NumericalColumnStats,
-    ) -> DomainProfile:
+    ) -> NumericalDomainProfile:
         is_stat_bounded = (
             stats.min >= 0
             and stats.max <= 1.0
@@ -463,45 +309,51 @@ class DomainProfiler:
             and not tags.is_score
         )
         is_bounded = tags.is_ratio or tags.is_rate or tags.is_score or is_stat_bounded
-        lower_bound = 0.0 if tags.is_monetary or is_bounded else None
+        lower_bound = 0.0 if tags.is_monetary or tags.is_count or is_bounded else None
 
         if tags.is_rate or tags.is_ratio:
             upper_bound = 100.0 if stats.max > 1.0 else 1.0
         else:
             upper_bound = None
 
-        return DomainProfile(
+        return NumericalDomainProfile(
             is_ratio=tags.is_ratio,
             is_monetary=tags.is_monetary,
             is_rate=tags.is_rate,
             is_score=tags.is_score,
+            is_count=tags.is_count,
             is_bounded=is_bounded,
             lower_bound=lower_bound,
             upper_bound=upper_bound,
         )
 
-    def build_for_categorical(self, tags: DomainTags) -> DomainProfile:
-        return DomainProfile(
-            is_ratio=tags.is_ratio,
-            is_monetary=tags.is_monetary,
-            is_rate=tags.is_rate,
-            is_score=tags.is_score,
-            is_bounded=False,
-            lower_bound=None,
-            upper_bound=None,
+    def build_for_categorical(
+        self,
+        tags: DomainTags,
+        stats: CategoricalColumnStats,
+    ) -> CategoricalDomainProfile:
+        thresholds = self._categorical_thresholds
+
+        return CategoricalDomainProfile(
+            is_sensitive=tags.is_monetary or tags.is_rate,
+            is_domain_specific=tags.any_set(),
+            has_dominant_category=(
+                stats.most_frequent_ratio >= thresholds.dominant_ratio_threshold
+            ),
+            is_sparse=stats.missing_ratio >= thresholds.sparse_missing_ratio,
         )
 
 
 class ColumnAnalyzer(ABC, Generic[StatsT, MetaT]):
     def __init__(
         self,
-        config: AnalyzerConfig | None = None,
-        domain_policy: DomainPolicy | None = None,
-        domain_profiler: DomainProfiler | None = None,
+        config: AnalyzerConfig,
+        domain_policy: DomainPolicy,
+        domain_profiler: DomainProfiler,
     ) -> None:
-        self.config = config or default_analyzer_config()
-        self.domain_policy = domain_policy or build_domain_policy(self.config.domain)
-        self.domain_profiler = domain_profiler or DomainProfiler()
+        self.config = config
+        self.domain_policy = domain_policy
+        self.domain_profiler = domain_profiler
 
     @property
     @abstractmethod
@@ -563,23 +415,19 @@ class NumericalColumnAnalyzer(
 ):
     def __init__(
         self,
-        config: AnalyzerConfig | None = None,
-        domain_policy: DomainPolicy | None = None,
-        domain_profiler: DomainProfiler | None = None,
-        semantic_policy: MatchPolicy[NumericalRuleContext, SemanticRole] | None = None,
-        task_policy: MatchPolicy[NumericalRuleContext, TaskType] | None = None,
+        config: AnalyzerConfig,
+        domain_policy: DomainPolicy,
+        domain_profiler: DomainProfiler,
+        semantic_policy: MatchPolicy[NumericalRuleContext, SemanticRole],
+        task_policy: MatchPolicy[NumericalRuleContext, TaskType],
     ) -> None:
         super().__init__(
             config=config,
             domain_policy=domain_policy,
             domain_profiler=domain_profiler,
         )
-        self.semantic_policy = semantic_policy or build_numerical_semantic_policy(
-            self.config.numerical
-        )
-        self.task_policy = task_policy or build_numerical_task_policy(
-            self.config.numerical
-        )
+        self.semantic_policy = semantic_policy
+        self.task_policy = task_policy
 
     @property
     def column_role(self) -> ColumnRole:
@@ -615,7 +463,7 @@ class NumericalColumnAnalyzer(
         self,
         stats: NumericalColumnStats,
         meta: NumericalColumnMeta,
-    ) -> StrategyEmbedding:
+    ) -> NumericalEmbedding:
         skewness_sensitivity = min(abs(stats.skewness) / 3.0, 1.0)
         outliers_sensitivity = min(stats.outlier_ratio * 5.0, 1.0)
 
@@ -626,7 +474,7 @@ class NumericalColumnAnalyzer(
             distribution_preservation -= 0.3
         distribution_preservation = max(distribution_preservation, 0.0)
 
-        return StrategyEmbedding(
+        return NumericalEmbedding(
             skewness_sensitivity=skewness_sensitivity,
             outliers_sensitivity=outliers_sensitivity,
             missing_ratio_fit=1.0 if stats.missing_ratio > 0 else 0.0,
@@ -661,24 +509,19 @@ class CategoricalColumnAnalyzer(
 ):
     def __init__(
         self,
-        config: AnalyzerConfig | None = None,
-        domain_policy: DomainPolicy | None = None,
-        domain_profiler: DomainProfiler | None = None,
-        semantic_policy: MatchPolicy[CategoricalRuleContext, SemanticRole]
-        | None = None,
-        task_policy: MatchPolicy[CategoricalRuleContext, TaskType] | None = None,
+        config: AnalyzerConfig,
+        domain_policy: DomainPolicy,
+        domain_profiler: DomainProfiler,
+        semantic_policy: MatchPolicy[CategoricalRuleContext, SemanticRole],
+        task_policy: MatchPolicy[CategoricalRuleContext, TaskType],
     ) -> None:
         super().__init__(
             config=config,
             domain_policy=domain_policy,
             domain_profiler=domain_profiler,
         )
-        self.semantic_policy = semantic_policy or build_categorical_semantic_policy(
-            self.config.categorical
-        )
-        self.task_policy = task_policy or build_categorical_task_policy(
-            self.config.categorical
-        )
+        self.semantic_policy = semantic_policy
+        self.task_policy = task_policy
 
     @property
     def column_role(self) -> ColumnRole:
@@ -739,11 +582,10 @@ class CategoricalColumnAnalyzer(
         self,
         stats: CategoricalColumnStats,
         meta: CategoricalColumnMeta,
-    ) -> StrategyEmbedding:
+    ) -> CategoricalEmbedding:
         thresholds = self.config.categorical
-        return StrategyEmbedding(
-            skewness_sensitivity=min(1.0 - min(stats.entropy / 5.0, 1.0), 1.0),
-            outliers_sensitivity=min(stats.rare_ratio * 5.0, 1.0),
+
+        return CategoricalEmbedding(
             missing_ratio_fit=min(stats.missing_ratio * 2.0, 1.0),
             distribution_preservation=1.0,
             target_safety=1.0 if meta.is_target else 0.2,
@@ -751,6 +593,12 @@ class CategoricalColumnAnalyzer(
                 stats.n_unique / thresholds.medium_cardinality_max,
                 1.0,
             ),
+            rare_categories_handling=min(
+                stats.rare_ratio / thresholds.rare_ratio_threshold, 1.0
+            ),
+            imbalance_sensitivity=self._calc_imbalance_sensitivity(stats),
+            order_awareness=self._calc_order_awareness(meta),
+            typo_tolerance=self._calc_typo_tolerance(stats, meta),
         )
 
     def build_meta(
@@ -765,7 +613,7 @@ class CategoricalColumnAnalyzer(
             role=self.detect_column_role(series),
             semantic_role=self.detect_semantic_role(stats),
             is_target=is_target,
-            domain_profile=self.domain_profiler.build_for_categorical(domain_tags),
+            domain_profile=self.domain_profiler.build_for_categorical(domain_tags, stats),
             task_type=self.resolve_task_type(stats, task_type),
             profile=self.build_categorical_profile(stats, domain_tags),
         )
@@ -773,22 +621,47 @@ class CategoricalColumnAnalyzer(
     def _infer_task_type(self, stats: CategoricalColumnStats) -> Decision[TaskType]:
         return self.task_policy.resolve(CategoricalRuleContext(stats=stats))
 
+    def _calc_imbalance_sensitivity(self, stats: CategoricalColumnStats) -> float:
+        thresholds = self.config.categorical
+
+        imbalance_from_ratio = (
+            stats.most_frequent_ratio / thresholds.dominant_ratio_threshold
+        )
+
+        max_entropy = np.log2(max(stats.n_unique, 2))
+        imbalance_from_entropy = (
+            1.0 - (stats.entropy / max_entropy) if max_entropy > 0 else 0.0
+        )
+
+        return min(max(imbalance_from_ratio, imbalance_from_entropy), 1.0)
+
+    def _calc_order_awareness(self, meta: CategoricalColumnMeta) -> float:
+        order_awareness = 1.0 if meta.profile.has_order else 0.0
+
+        if meta.semantic_role == SemanticRole.ORDINAL:
+            order_awareness = 1.0
+
+        if meta.task_type == TaskType.REGRESSION:
+            order_awareness *= 0.5
+
+        return order_awareness
+
+    def _calc_typo_tolerance(
+        self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta
+    ) -> float:
+        thresholds = self.config.categorical
+
+        typo_tolerance = 1.0 if meta.profile.has_typos else 0.0
+
+        if stats.n_unique > thresholds.medium_cardinality_max:
+            typo_tolerance = max(typo_tolerance, 0.5)
+
+        return typo_tolerance
+
 
 class AnalyzerRegistry:
-    def __init__(
-        self,
-        config: AnalyzerConfig | None = None,
-        domain_policy: DomainPolicy | None = None,
-        domain_profiler: DomainProfiler | None = None,
-    ) -> None:
-        config = config or default_analyzer_config()
-        domain_policy = domain_policy or build_domain_policy(config.domain)
-        domain_profiler = domain_profiler or DomainProfiler()
-
-        self._analyzers: list[ColumnAnalyzer] = [
-            NumericalColumnAnalyzer(config, domain_policy, domain_profiler),
-            CategoricalColumnAnalyzer(config, domain_policy, domain_profiler),
-        ]
+    def __init__(self, analyzers: tuple[ColumnAnalyzer, ...]) -> None:
+        self._analyzers = analyzers
 
     def get_analyzer(self, series: pd.Series) -> ColumnAnalyzer:
         matches = [a for a in self._analyzers if a.can_analyze(series)]
@@ -803,3 +676,33 @@ class AnalyzerRegistry:
             )
 
         return matches[0]
+
+
+class AnalyzerBuilder:
+    def __init__(self, config: AnalyzerConfig) -> None:
+        self._config = config
+
+    def build_registry(self) -> AnalyzerRegistry:
+        domain_policy = build_domain_policy(self._config.domain)
+        domain_profiler = DomainProfiler(
+            categorical_thresholds=self._config.categorical,
+        )
+
+        numerical_analyzer = NumericalColumnAnalyzer(
+            config=self._config,
+            domain_policy=domain_policy,
+            domain_profiler=domain_profiler,
+            semantic_policy=build_numerical_semantic_policy(self._config.numerical),
+            task_policy=build_numerical_task_policy(self._config.numerical),
+        )
+        categorical_analyzer = CategoricalColumnAnalyzer(
+            config=self._config,
+            domain_policy=domain_policy,
+            domain_profiler=domain_profiler,
+            semantic_policy=build_categorical_semantic_policy(self._config.categorical),
+            task_policy=build_categorical_task_policy(self._config.categorical),
+        )
+
+        return AnalyzerRegistry(
+            analyzers=(numerical_analyzer, categorical_analyzer),
+        )

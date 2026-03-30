@@ -12,7 +12,6 @@ from pills_core._enums import (
     TaskType,
     TransformPhase,
 )
-from pills_core.types.profiles import DomainProfile
 from pills_core.types.stats import StatsT
 
 MetaT = TypeVar("MetaT", bound="ColumnMeta")
@@ -24,7 +23,6 @@ class ColumnMeta:
     role: ColumnRole
     semantic_role: SemanticRole
     is_target: bool
-    domain_profile: DomainProfile
     task_type: TaskType
 
 

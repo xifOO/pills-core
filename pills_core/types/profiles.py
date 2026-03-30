@@ -10,6 +10,16 @@ class Cardinality(Enum):
 
 
 @dataclass
+class CategoricalDomainProfile:
+    expected_categories: List[str] = field(default_factory=list)
+    is_encoded: bool = False
+    is_sensitive: bool = False
+    is_domain_specific: bool = False
+    has_dominant_category: bool = False
+    is_sparse: bool = False
+
+
+@dataclass
 class CategoricalProfile:
     """Everything Inspector learned about the column."""
 
@@ -19,6 +29,19 @@ class CategoricalProfile:
     has_typos: bool = False
     has_order: bool = False  # low/medium/high
     is_domain_specific: bool = False
+    has_leading_nulls: bool = False
+
+
+@dataclass
+class NumericalDomainProfile:
+    is_ratio: bool
+    is_monetary: bool
+    is_rate: bool
+    is_score: bool
+    is_count: bool = False
+    is_bounded: bool = False
+    lower_bound: float | None = None
+    upper_bound: float | None = None
 
 
 @dataclass
@@ -28,22 +51,3 @@ class StatisticalProfile:
     has_outliers: bool
     is_sparse: bool
     is_low_variance: bool
-
-
-@dataclass
-class DomainProfile:
-    is_ratio: bool
-    is_monetary: bool
-    is_rate: bool
-    is_score: bool
-    is_bounded: bool = False
-    lower_bound: float | None = None
-    upper_bound: float | None = None
-
-
-@dataclass
-class CategoricalDomainProfile:
-    encoding_scheme: str
-    expected_categories: List[str] = field(default_factory=list)
-    is_encoded: bool = False
-    is_sensitive: bool = False
