@@ -5,8 +5,7 @@ import pandas as pd
 from scipy import stats as sstats
 
 from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
-from pills_core.strategies.base import StrategyEmbedding
-from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy
+from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy, NumericalEmbedding
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -23,7 +22,7 @@ class NumericalScalingStrategy(NumericalStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         normality_skewness_limit: float = 1.0,
     ) -> None:
@@ -117,7 +116,7 @@ class LogTransformStrategy(NumericalScalingStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         min_skewness: float,
     ) -> None:
@@ -182,7 +181,7 @@ class BoxCoxStrategy(NumericalScalingStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         min_skewness: float,
         shift_epsilon: float,

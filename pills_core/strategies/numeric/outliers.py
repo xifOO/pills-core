@@ -3,8 +3,7 @@ from typing import ClassVar
 import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TransformPhase
-from pills_core.strategies.base import StrategyEmbedding
-from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy
+from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy, NumericalEmbedding
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -18,7 +17,7 @@ class NumericalOutlierStrategy(NumericalStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         normality_skewness_limit: float = 1.0,
         min_sample_size: int = 30,
@@ -76,7 +75,7 @@ class IQRStrategy(NumericalOutlierStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         max_abs_skewness: float,
         min_outlier_ratio: float,
@@ -127,7 +126,7 @@ class ZScoreStrategy(NumericalOutlierStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         threshold: float,
         max_abs_skewness: float,
@@ -164,7 +163,7 @@ class WinsorizeStrategy(NumericalOutlierStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         min_outlier_ratio: float,
         min_sample_size: int,

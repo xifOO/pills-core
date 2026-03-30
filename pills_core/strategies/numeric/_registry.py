@@ -5,7 +5,7 @@ from pills_core.strategies.config import (
     NumericalImputationRegistryConfig,
     NumericalOutlierRegistryConfig,
     NumericalScalingRegistryConfig,
-    StrategyInstanceConfig,
+    NumericalStrategyInstanceConfig,
 )
 from pills_core.strategies.numeric.base import NumericalColumnMeta
 from pills_core.strategies.numeric.imputation import (
@@ -38,7 +38,7 @@ from pills_core.types.stats import NumericalColumnStats
 
 def _build_if_enabled(
     strategy: Type[StrategyT],
-    cfg: StrategyInstanceConfig,
+    cfg: NumericalStrategyInstanceConfig,
 ) -> Optional[StrategyT]:
     if not cfg.enabled:
         return None

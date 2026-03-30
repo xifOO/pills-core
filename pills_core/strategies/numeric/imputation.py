@@ -3,8 +3,8 @@ from typing import ClassVar
 import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
-from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
-from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalStrategy
+from pills_core.strategies.base import ColumnMeta
+from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalEmbedding, NumericalStrategy
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -27,7 +27,7 @@ class NumericalImputationStrategy(NumericalStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         sensitive_outlier_ratio_limit: float = 1.0,
         sensitive_skewness_limit: float = float("inf"),
@@ -164,7 +164,7 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         std_multiplier: float,
     ) -> None:
@@ -197,7 +197,7 @@ class LowerBoundaryImputation(NumericalImputationStrategy):
     def __init__(
         self,
         *,
-        embedding: StrategyEmbedding,
+        embedding: NumericalEmbedding,
         radius: float,
         std_multiplier: float,
     ) -> None:
