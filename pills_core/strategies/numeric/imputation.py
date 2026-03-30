@@ -3,8 +3,12 @@ from typing import ClassVar
 import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
-from pills_core.strategies.base import ColumnMeta, StrategyEmbedding
-from pills_core.strategies.numeric.base import NumericalStrategy
+from pills_core.strategies.base import ColumnMeta
+from pills_core.strategies.numeric.base import (
+    NumericalColumnMeta,
+    NumericalEmbedding,
+    NumericalStrategy,
+)
 from pills_core.types.stats import NumericalColumnStats
 
 
@@ -24,6 +28,18 @@ class NumericalImputationStrategy(NumericalStrategy):
     )
     requires_outliers_removed: ClassVar[bool] = False  # Mean / UpperBoundary only
 
+    def __init__(
+        self,
+        *,
+        embedding: NumericalEmbedding,
+        radius: float,
+        sensitive_outlier_ratio_limit: float = 1.0,
+        sensitive_skewness_limit: float = float("inf"),
+    ) -> None:
+        super().__init__(embedding=embedding, radius=radius)
+        self.sensitive_outlier_ratio_limit = sensitive_outlier_ratio_limit
+        self.sensitive_skewness_limit = sensitive_skewness_limit
+
     @property
     def phase(self) -> TransformPhase:
         return TransformPhase.IMPUTATION
@@ -31,9 +47,15 @@ class NumericalImputationStrategy(NumericalStrategy):
     def should_apply(self, stats: NumericalColumnStats, meta: ColumnMeta) -> bool:
         if not self.safe_for_target and meta.is_target:
             return False
-        if self.sensitive_to_outliers and stats.outlier_ratio > 0.15:
+        if (
+            self.sensitive_to_outliers
+            and stats.outlier_ratio > self.sensitive_outlier_ratio_limit
+        ):
             return False
-        if self.sensitive_to_skewness and abs(stats.skewness) > 1.0:
+        if (
+            self.sensitive_to_skewness
+            and abs(stats.skewness) > self.sensitive_skewness_limit
+        ):
             return False
         return stats.missing_ratio > 0
 
@@ -51,27 +73,15 @@ class NumericalImputationStrategy(NumericalStrategy):
 
 
 class MedianImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "median"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.9,
-        outliers_sensitivity=0.1,
-        missing_ratio_fit=0.8,
-        distribution_preservation=0.9,
-        target_safety=1.0,
-        cardinality_fit=0.0,
-    )
-    radius = 1.9
+    fills_with_existing_value: ClassVar[bool] = True
+    sensitive_to_outliers: ClassVar[bool] = False
+    sensitive_to_skewness: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = True
 
-    fills_with_existing_value = True
-    sensitive_to_outliers = False
-    sensitive_to_skewness = False
-    preserves_distribution = True
-
-    def __init__(self) -> None:
-        super().__init__(name="median")
-
-    def is_task_valid(self, meta: ColumnMeta) -> bool:
+    def is_task_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
             return False
 
@@ -82,28 +92,16 @@ class MedianImputation(NumericalImputationStrategy):
 
 
 class MeanImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "mean"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.2,
-        outliers_sensitivity=0.9,
-        missing_ratio_fit=0.7,
-        distribution_preservation=0.8,
-        target_safety=1.0,
-        cardinality_fit=0.5,
-    )
-    radius = 1.2
+    fills_with_existing_value: ClassVar[bool] = True
+    sensitive_to_outliers: ClassVar[bool] = True
+    sensitive_to_skewness: ClassVar[bool] = True
+    preserves_distribution: ClassVar[bool] = True
+    requires_outliers_removed: ClassVar[bool] = True
 
-    fills_with_existing_value = True
-    sensitive_to_outliers = True
-    sensitive_to_skewness = True
-    preserves_distribution = True
-    requires_outliers_removed = True
-
-    def __init__(self) -> None:
-        super().__init__(name="mean")
-
-    def is_task_valid(self, meta: ColumnMeta) -> bool:
+    def is_task_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
             return False
 
@@ -114,27 +112,17 @@ class MeanImputation(NumericalImputationStrategy):
 
 
 class ModeImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "mode"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.5,
-        outliers_sensitivity=0.1,
-        missing_ratio_fit=0.6,
-        distribution_preservation=0.3,
-        target_safety=1.0,
-        cardinality_fit=0.9,
+    fills_with_existing_value: ClassVar[bool] = True
+    sensitive_to_outliers: ClassVar[bool] = False
+    sensitive_to_skewness: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = (
+        False  # artificially inflates the mode frequency
     )
-    radius = 1.2
 
-    fills_with_existing_value = True
-    sensitive_to_outliers = False
-    sensitive_to_skewness = False
-    preserves_distribution = False  # artificially inflates the mode frequency
-
-    def __init__(self) -> None:
-        super().__init__(name="mode")
-
-    def is_task_valid(self, meta: ColumnMeta) -> bool:
+    def is_task_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.task_type == TaskType.TIME_SERIES and meta.is_target:
             return False
 
@@ -145,27 +133,15 @@ class ModeImputation(NumericalImputationStrategy):
 
 
 class ZeroImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "constant_zero"
     family_role: ClassVar[FamilyRole] = FamilyRole.CONSTANT
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.6,
-        outliers_sensitivity=0.4,
-        missing_ratio_fit=0.9,
-        distribution_preservation=0.2,
-        target_safety=1.0,
-        cardinality_fit=0.4,
-    )
-    radius = 1.0
+    fills_with_existing_value: ClassVar[bool] = False
+    sensitive_to_outliers: ClassVar[bool] = False
+    sensitive_to_skewness: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = False
 
-    fills_with_existing_value = False
-    sensitive_to_outliers = False
-    sensitive_to_skewness = False
-    preserves_distribution = False
-
-    def __init__(self) -> None:
-        super().__init__(name="constant_zero")
-
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.semantic_role in (SemanticRole.COUNT, SemanticRole.CONTINUOUS):
             return False
 
@@ -179,29 +155,27 @@ class ZeroImputation(NumericalImputationStrategy):
 
 
 class UpperBoundaryImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "upper_boundary"
     family_role: ClassVar[FamilyRole] = FamilyRole.BOUNDARY
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.8,
-        outliers_sensitivity=0.6,
-        missing_ratio_fit=0.5,
-        distribution_preservation=0.2,
-        target_safety=0.0,
-        cardinality_fit=0.3,
-    )
-    radius = 1.1
+    fills_with_existing_value: ClassVar[bool] = True
+    sensitive_to_outliers: ClassVar[bool] = True
+    sensitive_to_skewness: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = False
+    safe_for_target: ClassVar[bool] = False
+    requires_outliers_removed: ClassVar[bool] = True
 
-    fills_with_existing_value = True
-    sensitive_to_outliers = True
-    sensitive_to_skewness = False
-    preserves_distribution = False
-    safe_for_target = False
-    requires_outliers_removed = True
+    def __init__(
+        self,
+        *,
+        embedding: NumericalEmbedding,
+        radius: float,
+        std_multiplier: float,
+    ) -> None:
+        super().__init__(embedding=embedding, radius=radius)
+        self.std_multiplier = std_multiplier
 
-    def __init__(self) -> None:
-        super().__init__(name="upper_boundary")
-
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if (
             meta.domain_profile.is_bounded
             and meta.domain_profile.upper_bound is not None
@@ -211,32 +185,30 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
         return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
-        return data.fillna(stats.mean + 3 * stats.std)
+        return data.fillna(stats.mean + self.std_multiplier * stats.std)
 
 
 class LowerBoundaryImputation(NumericalImputationStrategy):
+    name: ClassVar[str] = "lower_boundary"
     family_role: ClassVar[FamilyRole] = FamilyRole.BOUNDARY
 
-    embedding = StrategyEmbedding(
-        skewness_sensitivity=0.8,
-        outliers_sensitivity=0.6,
-        missing_ratio_fit=0.5,
-        distribution_preservation=0.2,
-        target_safety=0.0,
-        cardinality_fit=0.3,
-    )
-    radius = 1.1
+    fills_with_existing_value: ClassVar[bool] = True
+    sensitive_to_outliers: ClassVar[bool] = True
+    sensitive_to_skewness: ClassVar[bool] = False
+    preserves_distribution: ClassVar[bool] = False
+    safe_for_target: ClassVar[bool] = False
 
-    fills_with_existing_value = True
-    sensitive_to_outliers = True
-    sensitive_to_skewness = False
-    preserves_distribution = False
-    safe_for_target = False
+    def __init__(
+        self,
+        *,
+        embedding: NumericalEmbedding,
+        radius: float,
+        std_multiplier: float,
+    ) -> None:
+        super().__init__(embedding=embedding, radius=radius)
+        self.std_multiplier = std_multiplier
 
-    def __init__(self) -> None:
-        super().__init__(name="lower_boundary")
-
-    def is_domain_valid(self, meta: ColumnMeta) -> bool:
+    def is_domain_valid(self, meta: NumericalColumnMeta) -> bool:
         if meta.domain_profile.is_monetary or meta.domain_profile.is_rate:
             return False
 
@@ -249,4 +221,4 @@ class LowerBoundaryImputation(NumericalImputationStrategy):
         return True
 
     def apply(self, data: pd.Series, stats: NumericalColumnStats) -> pd.Series:
-        return data.fillna(stats.mean - 3 * stats.std)
+        return data.fillna(stats.mean - self.std_multiplier * stats.std)

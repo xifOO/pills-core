@@ -1,6 +1,11 @@
 import pytest
 
 from pills_core._enums import TransformPhase
+from pills_core.strategies.config import (
+    NumericalImputationRegistryConfig,
+    NumericalOutlierRegistryConfig,
+    NumericalScalingRegistryConfig,
+)
 from pills_core.strategies.numeric._registry import (
     build_imputation_registry,
     build_outliers_registry,
@@ -17,9 +22,10 @@ def assert_before(order, a, b):
     assert order.index(a) < order.index(b), f"{a} should appear before {b} in {order}"
 
 
-imputation_registry = build_imputation_registry()
-outlier_registry = build_outliers_registry()
-scaling_registry = build_scaling_registry()
+imputation_registry = build_imputation_registry(NumericalImputationRegistryConfig())
+outlier_registry = build_outliers_registry(NumericalOutlierRegistryConfig())
+scaling_registry = build_scaling_registry(NumericalScalingRegistryConfig())
+
 
 IMPUTATIONS = imputation_registry.strategies
 OUTLIERS = outlier_registry.strategies

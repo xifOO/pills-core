@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import ClassVar, Dict, Generic, Optional
+from typing import ClassVar, Dict, Generic, Optional, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -12,15 +12,17 @@ from pills_core._enums import (
     TaskType,
     TransformPhase,
 )
-from pills_core.types.profiles import DomainProfile, StatisticalProfile
+from pills_core.types.profiles import DomainProfile
 from pills_core.types.stats import StatsT
+
+MetaT = TypeVar("MetaT", bound="ColumnMeta")
+EmbeddingT = TypeVar("EmbeddingT", bound="StrategyEmbedding")
 
 
 @dataclass
 class ColumnMeta:
     role: ColumnRole
     semantic_role: SemanticRole
-    profile: StatisticalProfile
     is_target: bool
     domain_profile: DomainProfile
     task_type: TaskType
@@ -35,8 +37,6 @@ class StrategyEmbedding:
     All values are in [0.0, 1.0] unless noted otherwise.
     """
 
-    skewness_sensitivity: float  # how well it handles skewed distributions
-    outliers_sensitivity: float  # how much outliers degrade it (higher = worse)
     missing_ratio_fit: float  # how well it handles high missing ratios
     distribution_preservation: float  # how much it preverses the original shape
     target_safety: float  # safe to apply on target variable
@@ -48,7 +48,7 @@ class StrategyEmbedding:
         return np.array(weighted_values, dtype=np.float32)
 
 
-class TransformStrategy(ABC, Generic[StatsT]):
+class TransformStrategy(ABC, Generic[StatsT, MetaT, EmbeddingT]):
     @property
     @abstractmethod
     def column_type(self) -> ColumnRole: ...
@@ -58,13 +58,13 @@ class TransformStrategy(ABC, Generic[StatsT]):
     def phase(self) -> TransformPhase: ...
 
     @abstractmethod
-    def is_domain_valid(self, meta: ColumnMeta) -> bool: ...
+    def is_domain_valid(self, meta: MetaT) -> bool: ...
 
     @abstractmethod
-    def is_task_valid(self, meta: ColumnMeta) -> bool: ...
+    def is_task_valid(self, meta: MetaT) -> bool: ...
 
     @abstractmethod
-    def should_apply(self, stats: StatsT, meta: ColumnMeta) -> bool: ...
+    def should_apply(self, stats: StatsT, meta: MetaT) -> bool: ...
 
     @abstractmethod
     def apply(self, data: pd.Series, stats: StatsT) -> pd.Series: ...
@@ -73,17 +73,18 @@ class TransformStrategy(ABC, Generic[StatsT]):
         return ""
 
 
-class SingleStrategy(TransformStrategy[StatsT], Generic[StatsT]):
+class SingleStrategy(
+    TransformStrategy[StatsT, MetaT, EmbeddingT], Generic[StatsT, MetaT, EmbeddingT]
+):
+    name: ClassVar[str]
     family_role: ClassVar[FamilyRole]
 
-    embedding: ClassVar[StrategyEmbedding]
-    radius: ClassVar[float] = 1.0
-
-    def __init__(self, name: str) -> None:
-        self.name = name
+    def __init__(self, *, embedding: EmbeddingT, radius: float) -> None:
+        self.embedding = embedding
+        self.radius = radius
 
     def distance(
-        self, column_embedding: StrategyEmbedding, weights: Dict[str, float]
+        self, column_embedding: EmbeddingT, weights: Dict[str, float]
     ) -> float:
         return float(
             np.linalg.norm(
@@ -94,9 +95,9 @@ class SingleStrategy(TransformStrategy[StatsT], Generic[StatsT]):
 
     def score(
         self,
-        column_embedding: StrategyEmbedding,
+        column_embedding: EmbeddingT,
         stats: StatsT,
-        meta: ColumnMeta,
+        meta: MetaT,
         weights: Dict[str, float],
     ) -> Optional[float]:
 
