@@ -1,8 +1,11 @@
 from typing import ClassVar
 
-from pills_core._enums import TransformPhase
+import pandas as pd
+
+from pills_core._enums import TaskType, TransformPhase
 from pills_core.strategies.categorical.base import (
     CategoricalColumnMeta,
+    CategoricalEmbedding,
     CategoricalStrategy,
 )
 from pills_core.types.profiles import Cardinality
@@ -63,3 +66,43 @@ class CategoricalImputationStrategy(CategoricalStrategy):
         if self.requires_cleaning:
             parts.append("requires cleaning for typos")
         return " | ".join(parts)
+
+
+class MostFrequentStrategy(CategoricalImputationStrategy):
+    def __init__(
+        self, 
+        *, 
+        embedding: CategoricalEmbedding, 
+        radius: float
+    ) -> None:
+        super().__init__(embedding=embedding, radius=radius)
+
+    def is_task_valid(self, meta: CategoricalColumnMeta) -> bool:
+        if meta.task_type == TaskType.REGRESSION or meta.task_type == TaskType.TIME_SERIES:
+            return False
+        
+        return True
+
+    def is_domain_valid(self, meta: CategoricalColumnMeta) -> bool:
+        if meta.profile.has_order:
+            return False
+        
+        if meta.profile.cardinality == Cardinality.HIGH and meta.profile.n_unique > 100:
+            return False
+        
+        return True
+
+    def should_apply(self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta) -> bool:
+        if stats.missing_ratio > 0.5:
+            return False
+        
+        if stats.most_frequent_ratio < 0.2:
+            return False
+        
+        if stats.rare_ratio > 0.3:
+            return False
+        
+        return super().should_apply(stats, meta)
+    
+    def apply(self, data: pd.Series, stats: CategoricalColumnStats) -> pd.Series:
+        return data.fillna(stats.mode)
