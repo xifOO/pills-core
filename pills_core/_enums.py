@@ -55,3 +55,9 @@ class DriftSeverity(StrEnum):
         elif psi < 0.2:
             return cls.MODERATE
         return cls.CRITICAL
+
+
+class ValidationStrategy(StrEnum):
+    HOLDOUT = auto()
+    CV = auto()
+    TIME_SERIES = auto()

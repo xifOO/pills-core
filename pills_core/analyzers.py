@@ -17,7 +17,7 @@ from pills_core.rules import (
     MatchPolicy,
     MatchRule,
 )
-from pills_core.strategies.base import ColumnMeta, MetaT, StrategyEmbedding
+from pills_core.strategies.base import EmbeddingT, MetaT
 from pills_core.strategies.categorical.base import (
     CategoricalColumnMeta,
     CategoricalEmbedding,
@@ -344,7 +344,7 @@ class DomainProfiler:
         )
 
 
-class ColumnAnalyzer(ABC, Generic[StatsT, MetaT]):
+class ColumnAnalyzer(ABC, Generic[StatsT, MetaT, EmbeddingT]):
     def __init__(
         self,
         config: AnalyzerConfig,
@@ -376,7 +376,7 @@ class ColumnAnalyzer(ABC, Generic[StatsT, MetaT]):
         self,
         stats: StatsT,
         meta: MetaT,
-    ) -> StrategyEmbedding: ...
+    ) -> EmbeddingT: ...
 
     @abstractmethod
     def build_meta(
@@ -385,7 +385,7 @@ class ColumnAnalyzer(ABC, Generic[StatsT, MetaT]):
         stats: StatsT,
         is_target: bool,
         task_type: TaskType = TaskType.AUTO,
-    ) -> ColumnMeta: ...
+    ) -> MetaT: ...
 
     @abstractmethod
     def _infer_task_type(self, stats: StatsT) -> Decision[TaskType]: ...
@@ -411,7 +411,7 @@ class ColumnAnalyzer(ABC, Generic[StatsT, MetaT]):
 
 
 class NumericalColumnAnalyzer(
-    ColumnAnalyzer[NumericalColumnStats, NumericalColumnMeta]
+    ColumnAnalyzer[NumericalColumnStats, NumericalColumnMeta, NumericalEmbedding]
 ):
     def __init__(
         self,
@@ -505,7 +505,7 @@ class NumericalColumnAnalyzer(
 
 
 class CategoricalColumnAnalyzer(
-    ColumnAnalyzer[CategoricalColumnStats, CategoricalColumnMeta]
+    ColumnAnalyzer[CategoricalColumnStats, CategoricalColumnMeta, CategoricalEmbedding]
 ):
     def __init__(
         self,
@@ -613,7 +613,9 @@ class CategoricalColumnAnalyzer(
             role=self.detect_column_role(series),
             semantic_role=self.detect_semantic_role(stats),
             is_target=is_target,
-            domain_profile=self.domain_profiler.build_for_categorical(domain_tags, stats),
+            domain_profile=self.domain_profiler.build_for_categorical(
+                domain_tags, stats
+            ),
             task_type=self.resolve_task_type(stats, task_type),
             profile=self.build_categorical_profile(stats, domain_tags),
         )
