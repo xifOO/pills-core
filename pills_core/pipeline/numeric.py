@@ -6,7 +6,9 @@ from pills_core.calculations.numeric import compute_stats
 from pills_core.pipeline.base import BasePipeline, FittedColumnArtifact
 from pills_core.strategies.base import SingleStrategy
 from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalEmbedding
-from pills_core.strategies.registry import StrategyRegistry
+from pills_core.strategies.numeric.imputation import NumericalImputationStrategy
+from pills_core.strategies.numeric.outliers import NumericalOutlierStrategy
+from pills_core.strategies.numeric.scaling import NumericalScalingStrategy
 from pills_core.strategies.resolver import resolve_phase_order
 from pills_core.types.stats import NumericalColumnStats
 
@@ -22,30 +24,26 @@ class NumericalColumnPipeline(
     def __init__(
         self,
         analyzer: NumericalColumnAnalyzer,
-        imputation_registry: StrategyRegistry,
-        outliers_registry: StrategyRegistry,
-        scaling_registry: StrategyRegistry,
+        imputation_strategy: NumericalImputationStrategy,
+        outlier_strategy: NumericalOutlierStrategy,
+        scaling_stratagy: NumericalScalingStrategy,
     ) -> None:
         self.analyzer = analyzer
-        self.imputation_registry = imputation_registry
-        self.outliers_registry = outliers_registry
-        self.scaling_registry = scaling_registry
+        self.imputation_strategy = imputation_strategy
+        self.outlier_strategy = outlier_strategy
+        self.scaling_stratagy = scaling_stratagy
 
     def fit(self, series: pd.Series, is_target: bool) -> FittedNumericalArtifact:
         stats = compute_stats(series)
         meta = self.analyzer.build_meta(series, stats, is_target)
         embedding = self.analyzer.build_column_embedding(stats, meta)
 
-        best_imputation = self.imputation_registry.resolve(meta, embedding, stats)[0][0]
-        best_outlier = self.outliers_registry.resolve(meta, embedding, stats)[0][0]
-        best_scaling = self.scaling_registry.resolve(meta, embedding, stats)[0][0]
-
-        phase_order = resolve_phase_order(best_imputation, best_outlier, best_scaling)
+        phase_order = resolve_phase_order(self.imputation_strategy, self.outlier_strategy, self.scaling_stratagy)
 
         strategies = {
-            TransformPhase.IMPUTATION: best_imputation,
-            TransformPhase.OUTLIER: best_outlier,
-            TransformPhase.SCALING: best_scaling,
+            TransformPhase.IMPUTATION: self.imputation_strategy,
+            TransformPhase.OUTLIER: self.outlier_strategy,
+            TransformPhase.SCALING: self.scaling_stratagy,
         }
 
         current = series.copy()
