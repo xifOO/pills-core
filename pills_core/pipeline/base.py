@@ -21,6 +21,9 @@ class FittedColumnArtifact(Generic[StatsT, MetaT, EmbeddingT]):
 
 class BasePipeline(Generic[StatsT, MetaT, EmbeddingT]):
     @abstractmethod
+    def compute_stats(self, series: pd.Series) -> StatsT: ...
+
+    @abstractmethod
     def fit(self, series: pd.Series, is_target: bool) -> FittedColumnArtifact: ...
 
     @abstractmethod

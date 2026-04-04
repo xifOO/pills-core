@@ -1,14 +1,15 @@
+from __future__ import annotations
+
+from typing import Dict
+
 import pandas as pd
 
 from pills_core._enums import TransformPhase
 from pills_core.analyzers import NumericalColumnAnalyzer
-from pills_core.calculations.numeric import compute_stats
 from pills_core.pipeline.base import BasePipeline, FittedColumnArtifact
 from pills_core.strategies.base import SingleStrategy
 from pills_core.strategies.numeric.base import NumericalColumnMeta, NumericalEmbedding
-from pills_core.strategies.numeric.imputation import NumericalImputationStrategy
-from pills_core.strategies.numeric.outliers import NumericalOutlierStrategy
-from pills_core.strategies.numeric.scaling import NumericalScalingStrategy
+from pills_core.strategies.registry import StrategyRegistry
 from pills_core.strategies.resolver import resolve_phase_order
 from pills_core.types.stats import NumericalColumnStats
 
@@ -24,35 +25,36 @@ class NumericalColumnPipeline(
     def __init__(
         self,
         analyzer: NumericalColumnAnalyzer,
-        imputation_strategy: NumericalImputationStrategy,
-        outlier_strategy: NumericalOutlierStrategy,
-        scaling_stratagy: NumericalScalingStrategy,
+        phase_registries: Dict[TransformPhase, StrategyRegistry],
     ) -> None:
-        self.analyzer = analyzer
-        self.imputation_strategy = imputation_strategy
-        self.outlier_strategy = outlier_strategy
-        self.scaling_stratagy = scaling_stratagy
+        self._analyzer = analyzer
+        self._phase_registries = phase_registries
+
+    def compute_stats(self, series: pd.Series) -> NumericalColumnStats:
+        from pills_core.calculations.numeric import (
+            compute_stats,  # late import - fix generic
+        )
+
+        return compute_stats(series)
 
     def fit(self, series: pd.Series, is_target: bool) -> FittedNumericalArtifact:
-        stats = compute_stats(series)
-        meta = self.analyzer.build_meta(series, stats, is_target)
-        embedding = self.analyzer.build_column_embedding(stats, meta)
+        stats = self.compute_stats(series)
+        meta = self._analyzer.build_meta(series, stats, is_target)
+        embedding = self._analyzer.build_column_embedding(stats, meta)
 
-        phase_order = resolve_phase_order(self.imputation_strategy, self.outlier_strategy, self.scaling_stratagy)
-
-        strategies = {
-            TransformPhase.IMPUTATION: self.imputation_strategy,
-            TransformPhase.OUTLIER: self.outlier_strategy,
-            TransformPhase.SCALING: self.scaling_stratagy,
-        }
+        selected = self._resolve_strategies(meta, embedding, stats)
 
         current = series.copy()
-        phase_stats = {}
+        phase_order = resolve_phase_order(*selected.values())
+        strategies: Dict[TransformPhase, SingleStrategy] = {}
+        phase_stats: Dict[TransformPhase, NumericalColumnStats] = {}
 
         for phase in phase_order:
-            phase_stats[phase] = compute_stats(current)
-            strategy: SingleStrategy = strategies[phase]
+            strategy = selected[phase]
+            phase_stats[phase] = self.compute_stats(current)
             current = strategy.apply(current, phase_stats[phase])
+
+            strategies[phase] = strategy
 
         return FittedNumericalArtifact(
             name=str(series.name),
@@ -70,3 +72,17 @@ class NumericalColumnPipeline(
                 result, artifact.phase_stats[phase]
             )
         return result
+
+    def _resolve_strategies(
+        self,
+        meta: NumericalColumnMeta,
+        embedding: NumericalEmbedding,
+        stats: NumericalColumnStats,
+    ) -> Dict[TransformPhase, SingleStrategy]:
+        selected = {}
+
+        for phase, registry in self._phase_registries.items():
+            ordered = registry.resolve(meta, embedding, stats)
+            selected[phase] = ordered[0][0]
+
+        return selected
