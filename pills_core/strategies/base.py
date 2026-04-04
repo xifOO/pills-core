@@ -114,3 +114,8 @@ class SingleStrategy(
             return None
 
         return dist
+
+    def ordering_constraints(
+        self, present_phases: set[TransformPhase]
+    ) -> set[tuple[TransformPhase, TransformPhase]]:
+        return set()

@@ -55,6 +55,13 @@ class NumericalScalingStrategy(NumericalStrategy):
             return False
         return True
 
+    def ordering_constraints(
+        self, present_phases: set[TransformPhase]
+    ) -> set[tuple[TransformPhase, TransformPhase]]:
+        if self.requires_outliers_removed and TransformPhase.OUTLIER in present_phases:
+            return {(TransformPhase.OUTLIER, TransformPhase.SCALING)}
+        return set()
+
     def explain(self, stats: NumericalColumnStats) -> str:
         parts = [f"Scaling with '{self.name}'"]
         parts.append(f"skewness={stats.skewness:.2f}")

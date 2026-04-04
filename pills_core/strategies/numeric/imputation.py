@@ -59,6 +59,19 @@ class NumericalImputationStrategy(NumericalStrategy):
             return False
         return stats.missing_ratio > 0
 
+    def ordering_constraints(
+        self, present_phases: set[TransformPhase]
+    ) -> set[tuple[TransformPhase, TransformPhase]]:
+        edges: set[tuple[TransformPhase, TransformPhase]] = set()
+
+        if TransformPhase.SCALING in present_phases:
+            edges.add((TransformPhase.IMPUTATION, TransformPhase.SCALING))
+
+        if self.requires_outliers_removed and TransformPhase.OUTLIER in present_phases:
+            edges.add((TransformPhase.OUTLIER, TransformPhase.IMPUTATION))
+
+        return edges
+
     def explain(self, stats: NumericalColumnStats) -> str:
         parts = [f"Imputing {stats.missing_ratio:.1%} missing with '{self.name}'"]
         if not self.preserves_distribution:
