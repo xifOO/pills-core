@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import List
+from typing import Any, Dict, List, Literal
 
 
 class Cardinality(Enum):
@@ -51,3 +51,11 @@ class StatisticalProfile:
     has_outliers: bool
     is_sparse: bool
     is_low_variance: bool
+
+
+@dataclass(frozen=True)
+class ColumnProfile:
+    name: str
+    inferred_type: Literal["numeric", "categorical", "datetime", "unknown"]
+    hints: Dict[str, Any]
+    
