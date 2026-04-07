@@ -58,4 +58,3 @@ class ColumnProfile:
     name: str
     inferred_type: Literal["numeric", "categorical", "datetime", "unknown"]
     hints: Dict[str, Any]
-    
