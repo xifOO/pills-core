@@ -1,7 +1,5 @@
 from typing import Dict, Generic, List, Tuple, TypeVar
 
-import pandas as pd
-
 from pills_core._enums import ColumnRole, TransformPhase
 from pills_core.strategies.base import MetaT, SingleStrategy, StrategyEmbedding
 from pills_core.types.stats import StatsT
@@ -65,18 +63,6 @@ class StrategyRegistry(Generic[StrategyT, StatsT, MetaT]):
 
         scored.sort(key=lambda x: x[1])
         return scored
-
-    def apply(
-        self,
-        data: pd.Series,
-        meta: MetaT,
-        column_embedding: StrategyEmbedding,
-        stats: StatsT,
-    ) -> pd.Series:
-        ordered = self.resolve(meta, column_embedding, stats)
-        if not ordered:
-            return data
-        return ordered[0][0].apply(data, stats)
 
     def get_search_space(
         self, meta: MetaT, column_embedding: StrategyEmbedding, stats: StatsT

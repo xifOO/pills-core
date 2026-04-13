@@ -9,9 +9,11 @@ from pills_core.strategies.numeric.base import (
     NumericalEmbedding,
     NumericalStrategy,
 )
+from pills_core.strategies.util import register_required_stats
 from pills_core.types.stats import NumericalColumnStats
 
 
+@register_required_stats("missing_ratio")
 class NumericalImputationStrategy(NumericalStrategy):
     fills_with_existing_value: ClassVar[bool] = (
         True  # it uses central tendency or a constant
@@ -85,6 +87,7 @@ class NumericalImputationStrategy(NumericalStrategy):
         return " | ".join(parts)
 
 
+@register_required_stats("median")
 class MedianImputation(NumericalImputationStrategy):
     name: ClassVar[str] = "median"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
@@ -104,6 +107,7 @@ class MedianImputation(NumericalImputationStrategy):
         return data.fillna(stats.median)
 
 
+@register_required_stats("mean")
 class MeanImputation(NumericalImputationStrategy):
     name: ClassVar[str] = "mean"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
@@ -124,6 +128,7 @@ class MeanImputation(NumericalImputationStrategy):
         return data.fillna(stats.mean)
 
 
+@register_required_stats("mode")
 class ModeImputation(NumericalImputationStrategy):
     name: ClassVar[str] = "mode"
     family_role: ClassVar[FamilyRole] = FamilyRole.CENTRAL_TENDENCY
@@ -167,6 +172,7 @@ class ZeroImputation(NumericalImputationStrategy):
         return data.fillna(0)
 
 
+@register_required_stats("mean", "std")
 class UpperBoundaryImputation(NumericalImputationStrategy):
     name: ClassVar[str] = "upper_boundary"
     family_role: ClassVar[FamilyRole] = FamilyRole.BOUNDARY
@@ -201,6 +207,7 @@ class UpperBoundaryImputation(NumericalImputationStrategy):
         return data.fillna(stats.mean + self.std_multiplier * stats.std)
 
 
+@register_required_stats("mean", "std")
 class LowerBoundaryImputation(NumericalImputationStrategy):
     name: ClassVar[str] = "lower_boundary"
     family_role: ClassVar[FamilyRole] = FamilyRole.BOUNDARY

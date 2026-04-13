@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from pills_core._enums import ColumnRole
 from pills_core.strategies.base import ColumnMeta, SingleStrategy, StrategyEmbedding
+from pills_core.strategies.util import register_required_stats
 from pills_core.types.profiles import NumericalDomainProfile, StatisticalProfile
 from pills_core.types.stats import NumericalColumnStats
 
@@ -19,6 +20,7 @@ class NumericalEmbedding(StrategyEmbedding):
     outliers_sensitivity: float  # how much outliers degrade it (higher = worse)
 
 
+@register_required_stats("outlier_ratio", "skewness")
 class NumericalStrategy(
     SingleStrategy[NumericalColumnStats, NumericalColumnMeta, NumericalEmbedding], ABC
 ):

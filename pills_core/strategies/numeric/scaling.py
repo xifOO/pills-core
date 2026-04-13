@@ -10,9 +10,11 @@ from pills_core.strategies.numeric.base import (
     NumericalEmbedding,
     NumericalStrategy,
 )
+from pills_core.strategies.util import register_required_stats
 from pills_core.types.stats import NumericalColumnStats
 
 
+@register_required_stats("min")
 class NumericalScalingStrategy(NumericalStrategy):
     requires_non_negative: ClassVar[bool] = False  # LogTransform, SqrtTransform
     is_invertible: ClassVar[bool] = True  # whether inverse denormalization is possible
@@ -75,6 +77,7 @@ class NumericalScalingStrategy(NumericalStrategy):
         return " | ".join(parts)
 
 
+@register_required_stats("mean", "std")
 class StandardScalerStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "standard_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.LINEAR_SCALING
@@ -89,6 +92,7 @@ class StandardScalerStrategy(NumericalScalingStrategy):
         return (data - stats.mean) / stats.std
 
 
+@register_required_stats("max")
 class MinMaxScalerStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "min_max_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.LINEAR_SCALING
@@ -162,6 +166,7 @@ class LogTransformStrategy(NumericalScalingStrategy):
         return pd.Series(np.log1p(data), index=data.index)
 
 
+@register_required_stats("q1", "q3", "median")
 class RobustScalerStrategy(NumericalScalingStrategy):
     name: ClassVar[str] = "robust_scaler"
     family_role: ClassVar[FamilyRole] = FamilyRole.ROBUST
