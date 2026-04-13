@@ -3,7 +3,7 @@ from typing import Literal
 
 import pandas as pd
 
-from pills_core.types.profiles import ColumnProfile
+from pills_core.types.profiles import ColumnTypeProfile
 
 
 class TypeInferencer:
@@ -19,8 +19,8 @@ class TypeInferencer:
         self.coercion_thresholds = coercion_thresholds
         self.max_sample_size = max_sample_size
 
-    def infer(self, series: pd.Series) -> ColumnProfile:
-        return ColumnProfile(
+    def infer(self, series: pd.Series) -> ColumnTypeProfile:
+        return ColumnTypeProfile(
             name=str(series.name),
             inferred_type=self._detect_type(series),
             hints=self._build_hints(series),
@@ -32,12 +32,12 @@ class TypeInferencer:
         if series.empty:
             return "unknown"
 
-        if pd.api.types.is_numeric_dtype(series):
+        if pd.api.types.is_bool_dtype(series):
+            return "categorical"
+        elif pd.api.types.is_numeric_dtype(series):
             return "numeric"
         elif pd.api.types.is_datetime64_any_dtype(series):
             return "datetime"
-        elif pd.api.types.is_bool_dtype(series):
-            return "categorical"
 
         if series.dtype == "object" or str(series.dtype).startswith("string"):
             return self._inspect_object_column(series)
@@ -48,14 +48,10 @@ class TypeInferencer:
         self, series: pd.Series
     ) -> Literal["numeric", "categorical", "datetime", "unknown"]:
         clean = series.dropna()
-        sample = (
-            clean.sample(n=min(len(clean), self.max_sample_size), random_state=42)
-            if len(clean) > 0
-            else pd.Series([], dtype=object)
-        )
-
-        if sample.empty:
+        if clean.empty:
             return "unknown"
+        
+        sample = clean.sample(n=min(len(clean), self.max_sample_size), random_state=42)
 
         python_types = sample.map(type).unique()
         if len(python_types) > 1:
@@ -63,15 +59,18 @@ class TypeInferencer:
             if coerced.notna().mean() >= self.coercion_thresholds:
                 return "numeric"
 
+            if self._looks_like_datetime(sample.astype(str)):
+                return "datetime"
+            
             warnings.warn(
                 f"Column '{series.name}' contains mixed Python types and failed numeric coercion. "
                 f"Returning 'unknown'. Consider cleaning the source or using schema overrides.",
-                stacklevel=4
+                stacklevel=5
             )
             return "unknown"
 
-        cardinality = sample.nunique()
-        ratio = cardinality / len(sample)
+        cardinality = clean.nunique()
+        ratio = cardinality / len(clean)
 
         if cardinality < self.cardinality_abs or ratio < self.cardinality_ratio:
             return "categorical"
@@ -82,6 +81,9 @@ class TypeInferencer:
         return "unknown"
 
     def _looks_like_datetime(self, series: pd.Series) -> bool:
+        if pd.api.types.is_numeric_dtype(series):
+            return False
+        
         try:
             coerced = pd.to_datetime(series, errors="coerce")
             return coerced.notna().mean() >= self.coercion_thresholds
@@ -92,7 +94,8 @@ class TypeInferencer:
         if series.empty:
             return {"cardinality": 0, "missing_rate": 0.0, "dtype": str(series.dtype)}
 
-        sample = series.dropna().sample(min(1_000, len(series)), random_state=42)
+        clean = series.dropna()
+        sample = clean.sample(min(1_000, len(clean)), random_state=42) if len(clean) > 0 else clean
         return {
             "cardinality": sample.nunique(),
             "missing_rate": float(series.isna().mean()),
