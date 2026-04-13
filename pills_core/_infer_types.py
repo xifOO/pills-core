@@ -50,7 +50,7 @@ class TypeInferencer:
         clean = series.dropna()
         if clean.empty:
             return "unknown"
-        
+
         sample = clean.sample(n=min(len(clean), self.max_sample_size), random_state=42)
 
         python_types = sample.map(type).unique()
@@ -61,11 +61,11 @@ class TypeInferencer:
 
             if self._looks_like_datetime(sample.astype(str)):
                 return "datetime"
-            
+
             warnings.warn(
                 f"Column '{series.name}' contains mixed Python types and failed numeric coercion. "
                 f"Returning 'unknown'. Consider cleaning the source or using schema overrides.",
-                stacklevel=5
+                stacklevel=5,
             )
             return "unknown"
 
@@ -83,7 +83,7 @@ class TypeInferencer:
     def _looks_like_datetime(self, series: pd.Series) -> bool:
         if pd.api.types.is_numeric_dtype(series):
             return False
-        
+
         try:
             coerced = pd.to_datetime(series, errors="coerce")
             return coerced.notna().mean() >= self.coercion_thresholds
@@ -95,7 +95,11 @@ class TypeInferencer:
             return {"cardinality": 0, "missing_rate": 0.0, "dtype": str(series.dtype)}
 
         clean = series.dropna()
-        sample = clean.sample(min(1_000, len(clean)), random_state=42) if len(clean) > 0 else clean
+        sample = (
+            clean.sample(min(1_000, len(clean)), random_state=42)
+            if len(clean) > 0
+            else clean
+        )
         return {
             "cardinality": sample.nunique(),
             "missing_rate": float(series.isna().mean()),
