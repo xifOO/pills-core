@@ -5,6 +5,8 @@ import pandas as pd
 
 from pills_core.types.profiles import ColumnTypeProfile
 
+INFER_TYPES = Literal["numeric", "categorical", "datetime", "unknown"]
+
 
 class TypeInferencer:
     def __init__(
@@ -26,9 +28,7 @@ class TypeInferencer:
             hints=self._build_hints(series),
         )
 
-    def _detect_type(
-        self, series: pd.Series
-    ) -> Literal["numeric", "categorical", "datetime", "unknown"]:
+    def _detect_type(self, series: pd.Series) -> INFER_TYPES:
         if series.empty:
             return "unknown"
 
@@ -44,9 +44,7 @@ class TypeInferencer:
 
         return "unknown"
 
-    def _inspect_object_column(
-        self, series: pd.Series
-    ) -> Literal["numeric", "categorical", "datetime", "unknown"]:
+    def _inspect_object_column(self, series: pd.Series) -> INFER_TYPES:
         clean = series.dropna()
         if clean.empty:
             return "unknown"
