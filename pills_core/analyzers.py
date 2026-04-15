@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 
 from pills_core._enums import ColumnRole, SemanticRole, TaskType
-from pills_core.exceptions import AmbiguousAnalyzerError, NoAnalyzerFoundError
+from pills_core._infer_types import INFER_TYPES
+from pills_core.exceptions import NoAnalyzerFoundError
 from pills_core.rules import (
     Decision,
     DomainPolicy,
@@ -27,6 +28,7 @@ from pills_core.types.profiles import (
     Cardinality,
     CategoricalDomainProfile,
     CategoricalProfile,
+    ColumnTypeProfile,
     NumericalDomainProfile,
     StatisticalProfile,
 )
@@ -359,8 +361,9 @@ class ColumnAnalyzer(ABC, Generic[StatsT, MetaT, EmbeddingT]):
     @abstractmethod
     def column_role(self) -> ColumnRole: ...
 
+    @property
     @abstractmethod
-    def can_analyze(self, series: pd.Series) -> bool: ...
+    def handles_type(self) -> INFER_TYPES: ...
 
     @abstractmethod
     def resolve_semantic_role(self, stats: StatsT) -> Decision[SemanticRole]: ...
@@ -384,16 +387,12 @@ class ColumnAnalyzer(ABC, Generic[StatsT, MetaT, EmbeddingT]):
         series: pd.Series,
         stats: StatsT,
         is_target: bool,
+        column_role: ColumnRole,
         task_type: TaskType = TaskType.AUTO,
     ) -> MetaT: ...
 
     @abstractmethod
     def _infer_task_type(self, stats: StatsT) -> Decision[TaskType]: ...
-
-    def detect_column_role(self, series: pd.Series) -> ColumnRole:
-        if self.can_analyze(series):
-            return self.column_role
-        return ColumnRole.DROP
 
     def detect_semantic_role(self, stats: StatsT) -> SemanticRole:
         return self.resolve_semantic_role(stats).value
@@ -433,8 +432,9 @@ class NumericalColumnAnalyzer(
     def column_role(self) -> ColumnRole:
         return ColumnRole.NUMERICAL
 
-    def can_analyze(self, series: pd.Series) -> bool:
-        return bool(pd.api.types.is_numeric_dtype(series))
+    @property
+    def handles_type(self) -> INFER_TYPES:
+        return "numeric"
 
     def resolve_semantic_role(
         self,
@@ -488,11 +488,12 @@ class NumericalColumnAnalyzer(
         series: pd.Series,
         stats: NumericalColumnStats,
         is_target: bool,
+        column_role: ColumnRole,
         task_type: TaskType = TaskType.AUTO,
     ) -> NumericalColumnMeta:
         domain_tags = self.domain_policy.resolve(str(series.name))
         return NumericalColumnMeta(
-            role=self.detect_column_role(series),
+            role=column_role,
             semantic_role=self.detect_semantic_role(stats),
             profile=self.build_statistical_profile(stats),
             is_target=is_target,
@@ -527,8 +528,9 @@ class CategoricalColumnAnalyzer(
     def column_role(self) -> ColumnRole:
         return ColumnRole.CATEGORICAL
 
-    def can_analyze(self, series: pd.Series) -> bool:
-        return not bool(pd.api.types.is_numeric_dtype(series))
+    @property
+    def handles_type(self) -> INFER_TYPES:
+        return "categorical"
 
     def resolve_semantic_role(
         self,
@@ -606,11 +608,12 @@ class CategoricalColumnAnalyzer(
         series: pd.Series,
         stats: CategoricalColumnStats,
         is_target: bool,
+        column_role: ColumnRole,
         task_type: TaskType = TaskType.AUTO,
     ) -> CategoricalColumnMeta:
         domain_tags = self.domain_policy.resolve(str(series.name))
         return CategoricalColumnMeta(
-            role=self.detect_column_role(series),
+            role=column_role,
             semantic_role=self.detect_semantic_role(stats),
             is_target=is_target,
             domain_profile=self.domain_profiler.build_for_categorical(
@@ -663,21 +666,17 @@ class CategoricalColumnAnalyzer(
 
 class AnalyzerRegistry:
     def __init__(self, analyzers: tuple[ColumnAnalyzer, ...]) -> None:
-        self._analyzers = analyzers
+        self._analyzers: dict[str, ColumnAnalyzer] = {
+            a.handles_type: a for a in analyzers
+        }
 
-    def get_analyzer(self, series: pd.Series) -> ColumnAnalyzer:
-        matches = [a for a in self._analyzers if a.can_analyze(series)]
+    def get_analyzer(self, type_profile: ColumnTypeProfile) -> ColumnAnalyzer:
+        analyzer = self._analyzers.get(type_profile.inferred_type)
 
-        if not matches:
-            raise NoAnalyzerFoundError(str(series.name))
+        if analyzer is None:
+            raise NoAnalyzerFoundError(str(type_profile.name))
 
-        if len(matches) > 1:
-            raise AmbiguousAnalyzerError(
-                column_name=str(series.name),
-                analyzer_names=[type(a).__name__ for a in matches],
-            )
-
-        return matches[0]
+        return analyzer
 
 
 class AnalyzerBuilder:
