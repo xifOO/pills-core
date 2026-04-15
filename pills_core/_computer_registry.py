@@ -1,4 +1,3 @@
-
 from pills_core.config import ComputeConfig
 from pills_core.stats_computer import (
     CategoricalStatsComputer,
