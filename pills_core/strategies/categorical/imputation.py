@@ -7,12 +7,10 @@ from pills_core.strategies.categorical.base import (
     CategoricalColumnMeta,
     CategoricalStrategy,
 )
-from pills_core.strategies.util import register_required_stats
 from pills_core.types.profiles import Cardinality
 from pills_core.types.stats import CategoricalColumnStats
 
 
-@register_required_stats("missing_ratio")
 class CategoricalImputationStrategy(CategoricalStrategy):
     fills_with_existing_value: ClassVar[bool] = True  # uses existing category
     creates_new_category: ClassVar[bool] = False  # add a separate missing category
@@ -69,7 +67,6 @@ class CategoricalImputationStrategy(CategoricalStrategy):
         return " | ".join(parts)
 
 
-@register_required_stats("most_frequent_ratio", "rare_ratio", "mode")
 class MostFrequentStrategy(CategoricalImputationStrategy):
     def is_task_valid(self, meta: CategoricalColumnMeta) -> bool:
         if (
@@ -107,7 +104,6 @@ class MostFrequentStrategy(CategoricalImputationStrategy):
         return data.fillna(stats.mode)
 
 
-@register_required_stats("n_unique", "rare_ratio")
 class MissingStrategy(CategoricalImputationStrategy):
     creates_new_category: ClassVar[bool] = True
     sensitive_to_imbalance: ClassVar[bool] = False
