@@ -13,7 +13,7 @@ class ColumnRole(StrEnum):
     TARGET = auto()
     NUMERICAL = auto()
     CATEGORICAL = auto()
-    DATETIME = auto()
+    TIME_SERIES = auto()
     DROP = auto()
 
 
