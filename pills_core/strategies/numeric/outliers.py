@@ -8,11 +8,9 @@ from pills_core.strategies.numeric.base import (
     NumericalEmbedding,
     NumericalStrategy,
 )
-from pills_core.strategies.util import register_required_stats
 from pills_core.types.stats import NumericalColumnStats
 
 
-@register_required_stats("count")
 class NumericalOutlierStrategy(NumericalStrategy):
     clips_values: ClassVar[bool] = True  # strategy clips or removes values
     uses_robust_stats: ClassVar[bool] = True  # uses median/IQR instead of mean/std
@@ -69,7 +67,6 @@ class NumericalOutlierStrategy(NumericalStrategy):
         return " | ".join(parts)
 
 
-@register_required_stats("q1", "q3")
 class IQRStrategy(NumericalOutlierStrategy):
     name: ClassVar[str] = "iqr"
     family_role: ClassVar[FamilyRole] = FamilyRole.ROBUST
@@ -119,7 +116,6 @@ class IQRStrategy(NumericalOutlierStrategy):
         )
 
 
-@register_required_stats("mean", "std")
 class ZScoreStrategy(NumericalOutlierStrategy):
     name: ClassVar[str] = "z-score"
     family_role: ClassVar[FamilyRole] = FamilyRole.STATISTICAL

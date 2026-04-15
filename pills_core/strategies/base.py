@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from typing import ClassVar, Dict, Generic, Optional, Set, TypeVar
+from typing import ClassVar, Dict, Generic, Optional, TypeVar
 
 import numpy as np
 import pandas as pd
@@ -47,8 +47,6 @@ class StrategyEmbedding:
 
 
 class TransformStrategy(ABC, Generic[StatsT, MetaT, EmbeddingT]):
-    required_stats: ClassVar[Set[str]] = set()
-
     @property
     @abstractmethod
     def column_type(self) -> ColumnRole: ...
