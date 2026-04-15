@@ -2,24 +2,29 @@ from dataclasses import dataclass
 from typing import List, TypeVar, Union
 
 Numeric = Union[float, int]
-StatsT = TypeVar("StatsT")
+StatsT = TypeVar("StatsT", bound="BaseColumnStats")
 
 
 @dataclass
-class NumericalColumnStats:
+class BaseColumnStats:
+    count: int
+    n_unique: int
+    missing_ratio: float
+    unique_ratio: float
+
+
+@dataclass
+class NumericalColumnStats(BaseColumnStats):
     max: Numeric
     min: Numeric
     mean: Numeric
     median: Numeric
     mode: Numeric
     std: Numeric
-    count: int
     variance: Numeric
     skewness: float
     kurtosis: float
     range: Numeric
-    n_unique: Numeric
-    missing_ratio: float
     outlier_ratio: float
     q1: Numeric
     q3: Numeric
@@ -28,14 +33,11 @@ class NumericalColumnStats:
     is_integer_valued: bool
     monotonic_ratio: float
     cv: float  # std / mean
-    unique_ratio: float
     zero_ratio: float
 
 
 @dataclass
-class CategoricalColumnStats:
-    n_unique: Numeric
-    missing_ratio: float
+class CategoricalColumnStats(BaseColumnStats):
     most_frequent: str
     most_frequent_ratio: float
     rare_categories: List[str]
