@@ -45,6 +45,12 @@ class TrainingConfig(BaseSettings):
     folds: int = Field(default=5, description="Number of folds for cross-validation")
 
 
+class ComputeConfig(BaseSettings):
+    sample_size: int | None = Field(default=None, ge=1)
+    chunk_size: int | None = Field(default=None, ge=1)
+    rare_threshold: float = Field(default=0.01, ge=0.0, le=1.0)
+
+
 class PillConfig(BaseSettings):
     project_name: str = Field(
         default="my_pills_project", description="Project name for logs and saving"
@@ -57,7 +63,7 @@ class PillConfig(BaseSettings):
     data: DataProcessingConfig = Field(default_factory=DataProcessingConfig)
     training: TrainingConfig = Field(default_factory=TrainingConfig)
     strategies: StrategiesConfig = Field(default_factory=StrategiesConfig)
-
+    computes: ComputeConfig = Field(default_factory=ComputeConfig)
     model_config = SettingsConfigDict(
         title="Pills Main Configuration",
         env_file=".env",
