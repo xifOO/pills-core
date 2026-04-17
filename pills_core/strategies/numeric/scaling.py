@@ -5,6 +5,7 @@ import pandas as pd
 from scipy import stats as sstats
 
 from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
+from pills_core.explain import Explanation
 from pills_core.strategies.numeric.base import (
     NumericalColumnMeta,
     NumericalEmbedding,
@@ -62,17 +63,24 @@ class NumericalScalingStrategy(NumericalStrategy):
             return {(TransformPhase.OUTLIER, TransformPhase.SCALING)}
         return set()
 
-    def explain(self, stats: NumericalColumnStats) -> str:
-        parts = [f"Scaling with '{self.name}'"]
-        parts.append(f"skewness={stats.skewness:.2f}")
-        parts.append(f"outlier_ratio={stats.outlier_ratio:.1%}")
+    def explain(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> Explanation:
+        reasons = [f"Scaling with '{self.name}'"]
+        reasons.append(f"skewness={stats.skewness:.2f}")
+        reasons.append(f"outlier_ratio={stats.outlier_ratio:.1%}")
         if not self.preserves_distribution:
-            parts.append("changes distribution shape")
+            reasons.append("changes distribution shape")
         if not self.is_invertible:
-            parts.append("not invertible")
+            reasons.append("not invertible")
         if self.sensitive_to_outliers:
-            parts.append("sensitive to outliers")
-        return " | ".join(parts)
+            reasons.append("sensitive to outliers")
+
+        return Explanation(
+            name=self.name,
+            value="selected" if self.should_apply(stats, meta) else "rejected",
+            reasons=reasons,
+        )
 
 
 class StandardScalerStrategy(NumericalScalingStrategy):

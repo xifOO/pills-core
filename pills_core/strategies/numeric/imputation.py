@@ -3,6 +3,7 @@ from typing import ClassVar
 import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TaskType, TransformPhase
+from pills_core.explain import Explanation
 from pills_core.strategies.base import ColumnMeta
 from pills_core.strategies.numeric.base import (
     NumericalColumnMeta,
@@ -72,17 +73,23 @@ class NumericalImputationStrategy(NumericalStrategy):
 
         return edges
 
-    def explain(self, stats: NumericalColumnStats) -> str:
-        parts = [f"Imputing {stats.missing_ratio:.1%} missing with '{self.name}'"]
+    def explain(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> Explanation:
+        reasons = [f"Imputing {stats.missing_ratio:.1%} missing with '{self.name}'"]
         if not self.preserves_distribution:
-            parts.append("distorts distribution")
+            reasons.append("distorts distribution")
         if self.sensitive_to_outliers:
-            parts.append("sensitive to outliers")
+            reasons.append("sensitive to outliers")
         if self.sensitive_to_skewness:
-            parts.append("sensitive to skewness")
+            reasons.append("sensitive to skewness")
         if not self.safe_for_target:
-            parts.append("unsafe for target")
-        return " | ".join(parts)
+            reasons.append("unsafe for target")
+        return Explanation(
+            name=self.name,
+            value="selected" if self.should_apply(stats, meta) else "rejected",
+            reasons=reasons,
+        )
 
 
 class MedianImputation(NumericalImputationStrategy):

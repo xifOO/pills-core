@@ -12,6 +12,7 @@ from pills_core._enums import (
     TaskType,
     TransformPhase,
 )
+from pills_core.explain import Explanation
 from pills_core.types.stats import StatsT
 
 MetaT = TypeVar("MetaT", bound="ColumnMeta")
@@ -67,8 +68,8 @@ class TransformStrategy(ABC, Generic[StatsT, MetaT, EmbeddingT]):
     @abstractmethod
     def apply(self, data: pd.Series, stats: StatsT) -> pd.Series: ...
 
-    def explain(self, stats: StatsT) -> str:
-        return ""
+    @abstractmethod
+    def explain(self, stats: StatsT, meta: MetaT) -> Explanation: ...
 
 
 class SingleStrategy(

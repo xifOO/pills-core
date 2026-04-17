@@ -3,6 +3,7 @@ from typing import ClassVar
 import pandas as pd
 
 from pills_core._enums import FamilyRole, SemanticRole, TransformPhase
+from pills_core.explain import Explanation
 from pills_core.strategies.numeric.base import (
     NumericalColumnMeta,
     NumericalEmbedding,
@@ -52,19 +53,26 @@ class NumericalOutlierStrategy(NumericalStrategy):
             return False
         return stats.outlier_ratio > 0
 
-    def explain(self, stats: NumericalColumnStats) -> str:
-        parts = [f"Handling outliers with '{self.name}'"]
-        parts.append(f"outlier_ratio={stats.outlier_ratio:.1%}")
-        parts.append(f"skewness={stats.skewness:.2f}")
+    def explain(
+        self, stats: NumericalColumnStats, meta: NumericalColumnMeta
+    ) -> Explanation:
+        reasons = [f"Handling outliers with '{self.name}'"]
+        reasons.append(f"outlier_ratio={stats.outlier_ratio:.1%}")
+        reasons.append(f"skewness={stats.skewness:.2f}")
         if self.uses_robust_stats:
-            parts.append("uses median/IQR (robust)")
+            reasons.append("uses median/IQR (robust)")
         if self.assumes_normality:
-            parts.append("assumes normality")
+            reasons.append("assumes normality")
         if self.clips_values:
-            parts.append("clips values")
+            reasons.append("clips values")
         else:
-            parts.append("removes values → sets NaN")
-        return " | ".join(parts)
+            reasons.append("removes values → sets NaN")
+
+        return Explanation(
+            name=self.name,
+            value="selected" if self.should_apply(stats, meta) else "rejected",
+            reasons=reasons,
+        )
 
 
 class IQRStrategy(NumericalOutlierStrategy):

@@ -3,6 +3,7 @@ from typing import ClassVar
 import pandas as pd
 
 from pills_core._enums import TaskType, TransformPhase
+from pills_core.explain import Explanation
 from pills_core.strategies.categorical.base import (
     CategoricalColumnMeta,
     CategoricalStrategy,
@@ -52,19 +53,26 @@ class CategoricalImputationStrategy(CategoricalStrategy):
 
         return True
 
-    def explain(self, stats: CategoricalColumnStats) -> str:
-        parts = [f"Imputing categorical column with '{self.__class__.__name__}'"]
+    def explain(
+        self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta
+    ) -> Explanation:
+        reasons = [f"Imputing categorical column with '{self.__class__.__name__}'"]
         if not self.preserves_distribution:
-            parts.append("distorts category distribution")
+            reasons.append("distorts category distribution")
         if self.sensitive_to_high_cardinality:
-            parts.append("sensitive to high cardinality")
+            reasons.append("sensitive to high cardinality")
         if self.sensitive_to_rare_categories:
-            parts.append("sensitive to rare categories")
+            reasons.append("sensitive to rare categories")
         if not self.safe_for_target:
-            parts.append("unsafe for target")
+            reasons.append("unsafe for target")
         if self.requires_cleaning:
-            parts.append("requires cleaning for typos")
-        return " | ".join(parts)
+            reasons.append("requires cleaning for typos")
+
+        return Explanation(
+            name=self.name,
+            value="selected" if self.should_apply(stats, meta) else "rejected",
+            reasons=reasons,
+        )
 
 
 class MostFrequentStrategy(CategoricalImputationStrategy):
