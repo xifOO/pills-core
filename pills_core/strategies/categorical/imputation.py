@@ -56,7 +56,7 @@ class CategoricalImputationStrategy(CategoricalStrategy):
     def explain(
         self, stats: CategoricalColumnStats, meta: CategoricalColumnMeta
     ) -> Explanation:
-        reasons = [f"Imputing categorical column with '{self.__class__.__name__}'"]
+        reasons = [f"Imputing categorical column with '{self.name}'"]
         if not self.preserves_distribution:
             reasons.append("distorts category distribution")
         if self.sensitive_to_high_cardinality:
@@ -113,6 +113,8 @@ class MostFrequentStrategy(CategoricalImputationStrategy):
 
 
 class MissingStrategy(CategoricalImputationStrategy):
+    name: ClassVar[str] = "missing"
+
     creates_new_category: ClassVar[bool] = True
     sensitive_to_imbalance: ClassVar[bool] = False
 
@@ -146,6 +148,8 @@ class MissingStrategy(CategoricalImputationStrategy):
 
 
 class ForwardFillStrategy(CategoricalImputationStrategy):
+    name: ClassVar[str] = "ffill"
+
     sensitive_to_imbalance: ClassVar[bool] = False
     preserves_distribution: ClassVar[bool] = False
     handles_rare_categories: ClassVar[bool] = True
@@ -174,6 +178,8 @@ class ForwardFillStrategy(CategoricalImputationStrategy):
 
 
 class BackwardFillStrategy(CategoricalImputationStrategy):
+    name: ClassVar[str] = "bfill"
+
     sensitive_to_imbalance: ClassVar[bool] = False
     preserves_distribution: ClassVar[bool] = False
     handles_rare_categories: ClassVar[bool] = True
