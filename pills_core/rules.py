@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Generic, TypeVar
 
 from pills_core.exceptions import UnknownDomainTagError
+from pills_core.explain import Explanation
 
 ValueT = TypeVar("ValueT")
 ContextT = TypeVar("ContextT")
@@ -18,6 +19,9 @@ _DOMAIN_TAG_FIELDS: frozenset[str] = frozenset(
 class Decision(Generic[ValueT]):
     value: ValueT
     reasons: tuple[str, ...] = field(default_factory=tuple)
+
+    def to_explanation(self, name: str) -> Explanation:
+        return Explanation(name=name, value=self.value, reasons=list(self.reasons))
 
 
 @dataclass(frozen=True, slots=True)

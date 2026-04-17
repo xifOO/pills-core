@@ -141,6 +141,8 @@ class CategoricalStatsComputer(StatsComputer[CategoricalColumnStats]):
 
         if count == 0:
             return CategoricalColumnStats(
+                count=count,
+                unique_ratio=0,
                 n_unique=0,
                 missing_ratio=1.0,
                 most_frequent="",
@@ -169,6 +171,8 @@ class CategoricalStatsComputer(StatsComputer[CategoricalColumnStats]):
         mode = mode_vals.iloc[0] if not mode_vals.empty else most_frequent
 
         return CategoricalColumnStats(
+            count=count,
+            unique_ratio=clean.nunique() / len(clean),
             n_unique=n_unique,
             missing_ratio=float(series.isna().mean()),
             most_frequent=str(most_frequent),
