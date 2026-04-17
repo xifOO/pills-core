@@ -10,5 +10,3 @@ class PhaseTrace:
     phase: TransformPhase
     candidates: Tuple[Tuple[SingleStrategy, float], ...]
     winner: SingleStrategy
-
-

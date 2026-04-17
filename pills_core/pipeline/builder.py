@@ -8,6 +8,7 @@ from pills_core._enums import TransformPhase
 from pills_core.pipeline.context import ColumnContext
 from pills_core.pipeline.sequence import TransformSequence
 from pills_core.pipeline.step import Step
+from pills_core.pipeline.trace import PhaseTrace
 from pills_core.stats_computer import StatsComputer
 from pills_core.strategies.base import SingleStrategy
 from pills_core.strategies.registry import StrategyRegistry
@@ -27,25 +28,33 @@ class PipelineBuilder:
 
     def build(
         self, series: pd.Series, context: ColumnContext, computer: StatsComputer
-    ) -> TransformSequence:
-        ordered = self._resolve(context)
-        return self._fit_steps(series, ordered, computer)
+    ) -> Tuple[TransformSequence, Tuple[PhaseTrace, ...]]:
+        ordered, traces = self._resolve(context)
+        sequence = self._fit_steps(series, ordered, computer)
+        return sequence, tuple(traces)
 
     def _resolve(
         self,
         context: ColumnContext,
-    ) -> List[Tuple[TransformPhase, SingleStrategy]]:
+    ) -> Tuple[List[Tuple[TransformPhase, SingleStrategy]], List[PhaseTrace]]:
         selected: Dict[TransformPhase, SingleStrategy] = {}
+        traces: List[PhaseTrace] = []
 
         for phase, registry in self._phase_registries.items():
             candidates = registry.resolve(
                 context.meta, context.embedding, context.stats
             )
             if candidates:
-                selected[phase] = candidates[0][0]
+                winner = candidates[0][0]
+                selected[phase] = winner
+
+                traces.append(
+                    PhaseTrace(phase=phase, candidates=tuple(candidates), winner=winner)
+                )
 
         phase_order = resolve_phase_order(*selected.values())
-        return [(phase, selected[phase]) for phase in phase_order]
+        ordered = [(phase, selected[phase]) for phase in phase_order]
+        return ordered, traces
 
     def _fit_steps(
         self,
