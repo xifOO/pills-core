@@ -1,5 +1,5 @@
-from dataclasses import asdict, dataclass, field
 import json
+from dataclasses import asdict, dataclass, field
 from typing import Any, List, Optional
 
 
@@ -12,9 +12,9 @@ class Explanation:
 
     def add_child(self, child: "Explanation") -> None:
         self.children.append(child)
-    
+
     def to_dict(self) -> dict:
         return asdict(self)
-    
+
     def to_json(self, indent: int = 2) -> str:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
