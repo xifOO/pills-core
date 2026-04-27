@@ -1,13 +1,11 @@
-from typing import Dict, Generic, List, Tuple, TypeVar
+from typing import Dict, List, Optional, Tuple
 
 from pills_core._enums import ColumnRole, TransformPhase
-from pills_core.strategies.base import MetaT, SingleStrategy, StrategyEmbedding
-from pills_core.types.stats import StatsT
-
-StrategyT = TypeVar("StrategyT", bound="SingleStrategy")
+from pills_core.strategies.base import ColumnMeta, SingleStrategy, StrategyEmbedding
+from pills_core.types.stats import BaseColumnStats
 
 
-class StrategyRegistry(Generic[StrategyT, StatsT, MetaT]):
+class StrategyRegistry:
     def __init__(
         self,
         column_type: ColumnRole,
@@ -17,16 +15,13 @@ class StrategyRegistry(Generic[StrategyT, StatsT, MetaT]):
         self.column_type = column_type
         self.phase = phase
         self.weights = weights
-        self._strategies: List[StrategyT] = []
+        self._strategies: List[SingleStrategy] = []
 
     @property
-    def strategies(self) -> List[StrategyT]:
-        # now only for tests
+    def strategies(self) -> List[SingleStrategy]:
         return self._strategies
 
-    def _register(
-        self, strategy: StrategyT
-    ) -> "StrategyRegistry[StrategyT, StatsT, MetaT]":
+    def _register(self, strategy: SingleStrategy) -> "StrategyRegistry":
         if strategy.column_type != self.column_type:
             raise TypeError(
                 f"Strategy {strategy.__class__.__name__} should be for {strategy.column_type}."
@@ -38,17 +33,22 @@ class StrategyRegistry(Generic[StrategyT, StatsT, MetaT]):
         self._strategies.append(strategy)
         return self
 
-    def bulk_register(self, strategies: List[StrategyT]):
+    def bulk_register(
+        self, strategies: List[Optional[SingleStrategy]]
+    ) -> "StrategyRegistry":
         for s in strategies:
             if s is not None:
                 self._register(s)
         return self
 
     def resolve(
-        self, meta: MetaT, column_embedding: StrategyEmbedding, stats: StatsT
-    ) -> List[Tuple[StrategyT, float]]:
+        self,
+        meta: ColumnMeta,
+        column_embedding: StrategyEmbedding,
+        stats: BaseColumnStats,
+    ) -> List[Tuple[SingleStrategy, float]]:
 
-        scored: List[Tuple[StrategyT, float]] = []
+        scored: List[Tuple[SingleStrategy, float]] = []
 
         for strategy in self._strategies:
             score = strategy.score(
@@ -65,7 +65,10 @@ class StrategyRegistry(Generic[StrategyT, StatsT, MetaT]):
         return scored
 
     def get_search_space(
-        self, meta: MetaT, column_embedding: StrategyEmbedding, stats: StatsT
+        self,
+        meta: ColumnMeta,
+        column_embedding: StrategyEmbedding,
+        stats: BaseColumnStats,
     ) -> Dict[str, List[str]]:
         """Remove out all impossible strategy combinations before Optuna even tries them."""
         return {

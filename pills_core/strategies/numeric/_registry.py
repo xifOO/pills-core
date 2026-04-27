@@ -1,25 +1,23 @@
 from typing import Optional, Type
 
 from pills_core._enums import ColumnRole, TransformPhase
+from pills_core.strategies.base import SingleStrategy
 from pills_core.strategies.config import (
     NumericalImputationRegistryConfig,
     NumericalOutlierRegistryConfig,
     NumericalScalingRegistryConfig,
     NumericalStrategyInstanceConfig,
 )
-from pills_core.strategies.numeric.base import NumericalColumnMeta
 from pills_core.strategies.numeric.imputation import (
     LowerBoundaryImputation,
     MeanImputation,
     MedianImputation,
     ModeImputation,
-    NumericalImputationStrategy,
     UpperBoundaryImputation,
     ZeroImputation,
 )
 from pills_core.strategies.numeric.outliers import (
     IQRStrategy,
-    NumericalOutlierStrategy,
     WinsorizeStrategy,
     ZScoreStrategy,
 )
@@ -27,19 +25,17 @@ from pills_core.strategies.numeric.scaling import (
     BoxCoxStrategy,
     LogTransformStrategy,
     MinMaxScalerStrategy,
-    NumericalScalingStrategy,
     RobustScalerStrategy,
     SqrtTransformStrategy,
     StandardScalerStrategy,
 )
-from pills_core.strategies.registry import StrategyRegistry, StrategyT
-from pills_core.types.stats import NumericalColumnStats
+from pills_core.strategies.registry import StrategyRegistry
 
 
 def _build_if_enabled(
-    strategy: Type[StrategyT],
+    strategy: Type[SingleStrategy],
     cfg: NumericalStrategyInstanceConfig,
-) -> Optional[StrategyT]:
+) -> Optional[SingleStrategy]:
     if not cfg.enabled:
         return None
 
@@ -55,9 +51,7 @@ def _build_if_enabled(
 
 def build_imputation_registry(
     config: NumericalImputationRegistryConfig,
-) -> StrategyRegistry[
-    NumericalImputationStrategy, NumericalColumnStats, NumericalColumnMeta
-]:
+) -> StrategyRegistry:
     s = config.strategies
 
     strategies = [
@@ -87,9 +81,7 @@ def build_imputation_registry(
         ),
     ]
 
-    return StrategyRegistry[
-        NumericalImputationStrategy, NumericalColumnStats, NumericalColumnMeta
-    ](
+    return StrategyRegistry(
         ColumnRole.NUMERICAL,
         TransformPhase.IMPUTATION,
         config.weights.as_dict(),
@@ -98,9 +90,7 @@ def build_imputation_registry(
 
 def build_outliers_registry(
     config: NumericalOutlierRegistryConfig,
-) -> StrategyRegistry[
-    NumericalOutlierStrategy, NumericalColumnStats, NumericalColumnMeta
-]:
+) -> StrategyRegistry:
     s = config.strategies
 
     strategies = [
@@ -118,9 +108,7 @@ def build_outliers_registry(
         ),
     ]
 
-    return StrategyRegistry[
-        NumericalOutlierStrategy, NumericalColumnStats, NumericalColumnMeta
-    ](
+    return StrategyRegistry(
         ColumnRole.NUMERICAL,
         TransformPhase.OUTLIER,
         config.weights.as_dict(),
@@ -129,9 +117,7 @@ def build_outliers_registry(
 
 def build_scaling_registry(
     config: NumericalScalingRegistryConfig,
-) -> StrategyRegistry[
-    NumericalScalingStrategy, NumericalColumnStats, NumericalColumnMeta
-]:
+) -> StrategyRegistry:
     s = config.strategies
 
     strategies = [
@@ -161,9 +147,7 @@ def build_scaling_registry(
         ),
     ]
 
-    return StrategyRegistry[
-        NumericalScalingStrategy, NumericalColumnStats, NumericalColumnMeta
-    ](
+    return StrategyRegistry(
         ColumnRole.NUMERICAL,
         TransformPhase.SCALING,
         config.weights.as_dict(),
